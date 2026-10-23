@@ -112,7 +112,7 @@ int main()
 
     std::string s = "BlackBerry 10";
     std::string_view view = s;
-    check("string_view", view.starts_with("Black") && view.ends_with("10") && view.substr(6, 4) == "Berr");
+    check("string_view", view.starts_with("Black") && view.ends_with("10") && view.substr(5, 4) == "Berr");
     check("std::to_string", std::to_string(42) + std::to_string(-1) == "42-1" && std::stod("0.25") == 0.25);
 
     std::variant<int, std::string> var = std::string("qnx");
