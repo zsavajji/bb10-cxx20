@@ -214,5 +214,9 @@ tests/                    test programs, build.sh, run-tests.sh
 Dockerfile                XIAZY's image + this
 ```
 
-LLVM's libc++, libc++abi, libunwind and compiler-rt are under the Apache
-License 2.0 with LLVM Exceptions; the prebuilt runtimes carry that license.
+## License
+
+This repository is under the MIT License (`LICENSE`). LLVM's libc++,
+libc++abi, libunwind and compiler-rt, which the build downloads and the
+prebuilt runtimes are made from, are under the Apache License 2.0 with LLVM
+Exceptions; the prebuilt runtimes carry that license.
