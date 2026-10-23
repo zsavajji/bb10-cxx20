@@ -252,4 +252,6 @@ Dockerfile.release        XIAZY's image + a release's prebuilt tarball
 This repository is under the MIT License (`LICENSE`). LLVM's libc++,
 libc++abi, libunwind and compiler-rt, which the build downloads and the
 prebuilt runtimes are made from, are under the Apache License 2.0 with LLVM
-Exceptions; the prebuilt runtimes carry that license.
+Exceptions; the prebuilt runtimes carry that license. An installed prefix
+has both in `share/licenses/`. Programs linked with the runtimes need not
+carry LLVM's license (that is what the LLVM Exceptions are for).

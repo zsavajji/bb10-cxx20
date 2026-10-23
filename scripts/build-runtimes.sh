@@ -120,4 +120,13 @@ runtimes "$BUILD/static" "$PREFIX" \
     -DLIBCXX_ENABLE_SHARED=OFF -DLIBCXX_ENABLE_STATIC=ON \
     -DLIBUNWIND_HIDE_SYMBOLS=ON -DLIBCXXABI_HERMETIC_STATIC_LIBRARY=ON \
     -DLIBCXX_HERMETIC_STATIC_LIBRARY=ON
+# The licenses of what the prefix contains: LLVM's (Apache 2.0 with LLVM
+# Exceptions) for the runtimes and compiler-rt's parts, and this
+# repository's (MIT) for the driver, headers and libbb10-cxx20-rt.a's own code.
+for project in libcxx libcxxabi libunwind compiler-rt; do
+    mkdir -p "$PREFIX/share/licenses/$project"
+    cp "$SRC/$project/LICENSE.TXT" "$PREFIX/share/licenses/$project/"
+done
+mkdir -p "$PREFIX/share/licenses/bb10-cxx20"
+cp "$HERE/LICENSE" "$PREFIX/share/licenses/bb10-cxx20/"
 echo "installed: $PREFIX"
