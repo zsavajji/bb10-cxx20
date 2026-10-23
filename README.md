@@ -25,6 +25,20 @@ against their sha256), builds the runtimes into `/opt/bb10-cxx20`, builds
 the tests, and puts `/opt/bb10-cxx20/bin` on `PATH`. It takes about 3
 minutes.
 
+**Prebuilt image.** `Dockerfile.release` is the same image made from a
+release's tarball (checked against its sha256), without building anything:
+
+```sh
+docker build -f Dockerfile.release -t bb10-cxx20:19.1.7-1 .
+```
+
+Publishing a release also publishes that image to GitHub's registry
+(`.github/workflows/docker.yml`):
+
+```sh
+docker pull ghcr.io/zsavajji/bb10-cxx20:latest
+```
+
 **Prebuilt tarball.** `bb10-cxx20.tar.gz` is the `/opt/bb10-cxx20` that
 build produces. Unpack it into `/opt` of XIAZY's image (it needs that
 image's clang, binutils and SDK at their usual paths):
@@ -211,7 +225,9 @@ src-rt/                   libbb10-cxx20-rt.a sources (besides compiler-rt's)
 scripts/fetch-llvm.py     download and check the LLVM 19.1.7 sources
 scripts/build-runtimes.sh patch and build the runtimes, install a prefix
 tests/                    test programs, build.sh, run-tests.sh
-Dockerfile                XIAZY's image + this
+Dockerfile                XIAZY's image + this, built from source
+Dockerfile.release        XIAZY's image + a release's prebuilt tarball
+.github/workflows/        publishes Dockerfile.release's image to ghcr.io
 ```
 
 ## License
