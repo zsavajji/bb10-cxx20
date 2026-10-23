@@ -40,7 +40,7 @@ LIB = TARGET + "/armle-v7/lib"
 USR_LIB = TARGET + "/armle-v7/usr/lib"
 CXX = os.path.basename(sys.argv[0]).endswith("++")
 NOSTDLIB = bool(os.environ.get("BB10_CXX20_NOSTDLIB"))
-VERBOSE = bool(os.environ.get("BB10_CC_VERBOSE"))
+VERBOSE = bool(os.environ.get("BB10_CC_VERBOSE")) or "-v" in sys.argv[1:]
 
 
 def run(cmd):
@@ -174,8 +174,11 @@ def link(args, shared_cxx):
 def main():
     args = [a for a in sys.argv[1:] if a != "-shared-libc++"]
     shared_cxx = len(args) < len(sys.argv) - 1
-    if not args or any(a in ("-c", "-S", "-E", "-M", "-MM", "-fsyntax-only", "--version", "-v", "-dumpversion",
-                             "-dumpmachine") or a.startswith("-print-") for a in args):
+    # -v alone asks for the version; with other arguments it only makes the
+    # driver verbose (CMake links with -v to learn the implicit libraries).
+    if not args or args == ["-v"] or any(a in ("-c", "-S", "-E", "-M", "-MM", "-fsyntax-only", "--version",
+                                               "-dumpversion", "-dumpmachine")
+                                         or a.startswith("-print-") for a in args):
         return clang(args)
     return link(args, shared_cxx)
 

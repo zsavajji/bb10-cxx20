@@ -3,6 +3,11 @@
 cmake_minimum_required(VERSION 3.20)
 project(bb10_cxx20_cmake_test C CXX)
 
+# CMake learns these by compiling and linking a probe with the driver.
+if (NOT CMAKE_SIZEOF_VOID_P EQUAL 4 OR NOT CMAKE_CXX_IMPLICIT_LINK_LIBRARIES)
+    message(FATAL_ERROR "compiler ABI detection failed")
+endif ()
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
