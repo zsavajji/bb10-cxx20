@@ -120,7 +120,7 @@ the two over a process boundary or a C interface.
 | `bin/bb10-clang` | The driver (Python; `bb10-clang++` is a symlink). It compiles with clang for `armv7-none-eabi` with BB10's flags (`-mcpu=cortex-a9 -mfpu=vfpv3-d16 -mfloat-abi=softfp -D__QNX__ …`), with libc++'s headers ahead of the SDK's. It links with the armnto `ld`: `crt1.o`/`crti.o`/`crtn.o`, the C++ runtime, `libbb10-cxx20-rt.a`, `libm`, `libc` and compiler-rt's builtins. |
 | `lib/libc++.a`, `libc++abi.a`, `libunwind.a` | The static runtime, hermetic. |
 | `lib/libc++_shared.so.1` | The shared runtime. |
-| `lib/libbb10-cxx20-rt.a` | What BB10 lacks and every program may need: compiler-rt's emulated TLS (`thread_local`) and atomic libcalls, `__dso_handle`, and `vasprintf`/`asprintf`, `wcsnlen`, `mbsnrtowcs`, `wcsnrtombs`. |
+| `lib/libbb10-cxx20-rt.a` | What BB10 lacks and every program may need: compiler-rt's emulated TLS (`thread_local`) and atomic libcalls, `__dso_handle`, and `aligned_alloc`, `vasprintf`/`asprintf`, `wcsnlen`, `mbsnrtowcs`, `wcsnrtombs`. |
 | `include/c++/v1` | libc++'s headers. |
 | `include/bb10-compat` | Small wrappers over SDK headers that libc++ trips on (below). |
 | `share/bb10-cxx20.cmake` | CMake toolchain file. |
@@ -137,17 +137,18 @@ in this repository:
   Fuchsia, and its own ctype table, as for musl. QNX's `LC_*` constants are
   already bit masks, so `LC_*_MASK` are redefined to them.
 - **libc++ configuration** (`scripts/build-runtimes.sh` edits libc++ with
-  `sed`, and checks each edit took). No `aligned_alloc` (libc++ uses
-  `posix_memalign`). No `<nl_types.h>` message catalogs. In
+  `sed`, and checks each edit took). No `<nl_types.h>` message catalogs. In
   `<filesystem>`: stat times in whole seconds and no `openat()` family, as on
   z/OS.
 - **SDK headers** (`include/bb10-compat`): `<link.h>` (QNX has
   `<sys/link.h>`, with a `const` callback for `dl_iterate_phdr`).
   `<sys/cdefs.h>` and `<sys/siginfo.h>` stop Dinkumware's habit of putting
-  the C library in `namespace std`. `<math.h>` and `<wchar.h>` drop the
-  function-like macros (`cos`, `log`, `wcstod`, …) that break libc++'s
-  overloads; `<wchar.h>` and `<stdio.h>` declare the functions
-  `libbb10-cxx20-rt.a` adds. `<strings.h>` is fixed for C++, and
+  the C library in `namespace std` (and keep the SDK headers' include
+  guards working in C++). `<math.h>` and `<wchar.h>` drop the function-like
+  macros (`cos`, `log`, `wcstod`, …) that break libc++'s overloads, and
+  `<math.h>` the SDK's templates for mixed argument types; `<stdlib.h>`,
+  `<wchar.h>` and `<stdio.h>` declare the functions `libbb10-cxx20-rt.a`
+  adds. `<strings.h>` is fixed for C++, and
   `<langinfo.h>` is a stub. `-D_HAS_C9X=1` shows the SDK's C99 math
   (`fpclassify`, `FP_NAN`), and `-D_NO_CPP_INLINES` hides its C++ overloads.
 - **Exception tables.** The armnto linker script in XIAZY's binutils (2.45)

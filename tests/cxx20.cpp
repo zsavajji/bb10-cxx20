@@ -12,6 +12,7 @@
 #include <concepts>
 #include <condition_variable>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -121,6 +122,16 @@ int main()
     (*shared)["a"] = 1;
     std::unordered_map<std::string, int> hashed { { "x", 1 }, { "y", 2 } };
     check("containers", shared->at("a") == 1 && hashed.contains("y"));
+    struct alignas(64) CacheLine {
+        char bytes[64];
+    };
+    auto cacheLine = std::make_unique<CacheLine>();
+    void* c11 = std::aligned_alloc(256, 1024);
+    void* small = aligned_alloc(2, 16);
+    check("aligned new, aligned_alloc", reinterpret_cast<std::uintptr_t>(cacheLine.get()) % 64 == 0
+            && c11 && reinterpret_cast<std::uintptr_t>(c11) % 256 == 0 && small);
+    std::free(c11);
+    std::free(small);
     std::function<int(int)> f = [captured = 5](int x) { return x * captured; };
     check("std::function", f(3) == 15);
 

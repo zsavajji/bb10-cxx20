@@ -41,18 +41,14 @@ if ! grep -q "locale_base_api/qnx.h" "$LIBCXX/__locale_dir/locale_base_api.h"; t
     # ...no <nl_types.h> (message catalogs),
     sed -i 's|^#\(\s*\)if !defined(__BIONIC__) \&\& !defined(_NEWLIB_VERSION) \&\& !defined(__EMSCRIPTEN__)$|#\1if !defined(__BIONIC__) \&\& !defined(_NEWLIB_VERSION) \&\& !defined(__EMSCRIPTEN__) \&\& !defined(__QNX__)|' \
         "$LIBCXX/locale"
-    # ...stat times in whole seconds and no openat() family, as on z/OS,
+    # ...and stat times in whole seconds and no openat() family, as on z/OS.
     sed -i 's|^#elif defined(__MVS__)$|#elif defined(__MVS__) \|\| defined(__QNX__)|' \
         "$SRC/libcxx/src/filesystem/time_utils.h"
     sed -i 's|^#if defined(_LIBCPP_WIN32API) \|\| defined(__MVS__)$|#if defined(_LIBCPP_WIN32API) \|\| defined(__MVS__) \|\| defined(__QNX__)|' \
         "$SRC/libcxx/src/filesystem/operations.cpp"
-    # ...and no aligned_alloc(): libc++ falls back to posix_memalign().
-    sed -i 's|^#  elif defined(__ANDROID__) \&\& __ANDROID_API__ < 28$|#  elif defined(__QNX__)\n// BB10 (QNX 6.6) has no aligned_alloc().\n#    define _LIBCPP_HAS_NO_C11_ALIGNED_ALLOC\n&|' \
-        "$LIBCXX/__config"
     grep -q "locale_base_api/qnx.h" "$LIBCXX/__locale_dir/locale_base_api.h"
     grep -q "locale_base_api/qnx.h" "$LIBCXX/CMakeLists.txt"
     grep -q "defined(__OpenBSD__) || defined(__QNX__)" "$LIBCXX/__config"
-    grep -q "BB10 (QNX 6.6) has no aligned_alloc" "$LIBCXX/__config"
     grep -q "defined(__EMSCRIPTEN__) && !defined(__QNX__)" "$LIBCXX/locale"
     grep -q "defined(__MVS__) || defined(__QNX__)" "$SRC/libcxx/src/filesystem/time_utils.h"
     grep -q "defined(__MVS__) || defined(__QNX__)" "$SRC/libcxx/src/filesystem/operations.cpp"
@@ -67,8 +63,8 @@ if ! grep -q "hidden	__cxa_end_cleanup" "$ABI_EXC"; then
 fi
 
 # libbb10-cxx20-rt.a: emulated TLS (thread_local) and the atomic libcalls
-# from compiler-rt, on BB10's pthreads, __dso_handle, and the POSIX 2008
-# functions libc++ needs that BB10's libc lacks (src-rt/).
+# from compiler-rt, on BB10's pthreads, __dso_handle, and the C11 and POSIX
+# 2008 functions libc++ needs that BB10's libc lacks (src-rt/).
 rm -rf "$BUILD" && mkdir -p "$BUILD/rt"
 for f in emutls atomic; do
     BB10_CXX20_NOSTDLIB=1 "$CC" -O2 -c "$SRC/compiler-rt/lib/builtins/$f.c" \
