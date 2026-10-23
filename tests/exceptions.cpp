@@ -1,7 +1,5 @@
 // C++ exceptions, one step at a time: each step is named before it runs, so
-// a crash shows where. tests/build.sh builds it twice: `exceptions` with the
-// toolchain's default unwinder (LLVM's libunwind, linked in), and
-// `exceptions-sysunwind` with BB10's own (libgcc's, in libc.so.3/libm.so.2).
+// a crash shows where.
 #include <cstdio>
 #include <exception>
 #include <stdexcept>
