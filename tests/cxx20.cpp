@@ -76,6 +76,7 @@ static int sum(std::span<const int> values)
 
 int main()
 {
+    std::setvbuf(stdout, nullptr, _IOLBF, 0); // a crash keeps what was printed
     // Language.
     static_assert(twice(21) == 42);
     check("concepts", twice(1.5) == 3.0);

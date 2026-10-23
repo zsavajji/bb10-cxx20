@@ -19,6 +19,7 @@ static void check(const char *name, int ok)
 
 int main(void)
 {
+    setvbuf(stdout, NULL, _IOLBF, 0); /* a crash keeps what was printed */
     const char text[] = "BlackBerry 10 on QNX";
     check("memmem", memmem(text, sizeof text - 1, "10", 2) == text + 11 && !memmem(text, 4, "Berry", 5));
     check("memrchr", memrchr(text, 'B', sizeof text - 1) == text + 5);

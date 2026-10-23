@@ -30,6 +30,11 @@ printf '#include <stdbool.h>\n#include <stdint.h>\n#include <cstdint>\n' | "$CXX
 "$CXX" -O2 -shared "$HERE/plugin.cpp" -o "$OUT/plugin.so"
 "$CC" -O2 "$HERE/dlopen.c" -o "$OUT/dlopen"
 "$CC" -O2 -Wall -Werror "$HERE/libc.c" -o "$OUT/libc"
+# Exceptions with the toolchain's unwinder (LLVM's libunwind), and with
+# BB10's own (libgcc's, exported by libc.so.3 and libm.so.2) instead.
+"$CXX" -O2 "$HERE/exceptions.cpp" -o "$OUT/exceptions"
+"$CXX" -O2 -nostdlib++ "$HERE/exceptions.cpp" -o "$OUT/exceptions-sysunwind" -lc++ -lc++experimental -lc++abi
+"$CC" -O2 -Wall -Werror "$HERE/unwind-probe.c" -o "$OUT/unwind-probe"
 # A file under its SONAME: symlinks do not survive copying to the phone.
 cp "$TC/lib/libc++_shared.so.1" "$OUT/"
 
@@ -46,7 +51,7 @@ for lib in "$LIB/libc.so.3" "$LIB/libm.so.2" "$OUT/libc++_shared.so.1" "$OUT/lib
     "${B}nm" -D --defined-only "$lib" | awk '{ print $3 }'
 done | sort -u >"$defined"
 status=0
-for f in cxx20 cxx20-shared modules dlopen libc cmake-test libshape.so plugin.so libc++_shared.so.1; do
+for f in cxx20 cxx20-shared modules dlopen libc exceptions exceptions-sysunwind unwind-probe cmake-test libshape.so plugin.so libc++_shared.so.1; do
     missing=$("${B}nm" -D --undefined-only "$OUT/$f" | awk '$1 == "U" { print $2 }' | sort -u | comm -23 - "$defined")
     if [ -n "$missing" ]; then
         echo "$f: not on BB10: $missing"

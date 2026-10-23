@@ -3,7 +3,7 @@
 cd "$(dirname "$0")"
 export LD_LIBRARY_PATH="$PWD:${LD_LIBRARY_PATH:-}"
 failed=0
-for t in cxx20 cxx20-shared modules "dlopen $PWD/plugin.so" libc cmake-test; do
+for t in unwind-probe exceptions exceptions-sysunwind cxx20 cxx20-shared modules "dlopen $PWD/plugin.so" libc cmake-test; do
     echo "== $t"
     ./$t || failed=$((failed + 1))
 done

@@ -19,6 +19,7 @@ static void check(const char* name, bool ok)
 
 int main()
 {
+    std::setvbuf(stdout, nullptr, _IOLBF, 0); // a crash keeps what was printed
     auto circle = makeShape("circle 2");
     check("virtual call", std::abs(circle->area() - 12.566370614359172) < 1e-9 && circle->name() == "circle");
     const Shape& shape = *circle;

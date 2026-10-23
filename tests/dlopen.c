@@ -4,6 +4,7 @@
 
 int main(int argc, char** argv)
 {
+    setvbuf(stdout, NULL, _IOLBF, 0); /* a crash keeps what was printed */
     const char* path = argc > 1 ? argv[1] : "./plugin.so";
     void* plugin = dlopen(path, RTLD_NOW | RTLD_LOCAL);
     if (!plugin) {

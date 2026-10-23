@@ -119,7 +119,10 @@ cp -P "$BUILD"/shared-install/lib/libc++_shared.so* "$PREFIX/lib/"
 runtimes "$BUILD/static" "$PREFIX" \
     -DLIBCXX_ENABLE_SHARED=OFF -DLIBCXX_ENABLE_STATIC=ON \
     -DLIBUNWIND_HIDE_SYMBOLS=ON -DLIBCXXABI_HERMETIC_STATIC_LIBRARY=ON \
-    -DLIBCXX_HERMETIC_STATIC_LIBRARY=ON
+    -DLIBCXX_HERMETIC_STATIC_LIBRARY=ON \
+    `# libunwind stays its own library (the driver links it), so that a program` \
+    `# can use BB10's unwinder instead (libc.so.3 exports libgcc's)` \
+    -DLIBCXXABI_STATICALLY_LINK_UNWINDER_IN_STATIC_LIBRARY=OFF
 # The licenses of what the prefix contains: LLVM's (Apache 2.0 with LLVM
 # Exceptions) for the runtimes and compiler-rt's parts, and this
 # repository's (MIT) for the driver, headers and libbb10-cxx20-rt.a's own code.
