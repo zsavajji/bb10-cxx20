@@ -14,6 +14,10 @@ LIB=${QNX_TARGET:-/opt/bb10-sdk/target/qnx6}/armle-v7/lib
 mkdir -p "$OUT"
 OUT=$(cd "$OUT" && pwd)
 
+# The SDK's headers, in C and in C++ (compile only).
+"$CC" -fsyntax-only "$HERE/headers.c"
+"$CXX" -fsyntax-only "$HERE/headers.cpp"
+
 "$CXX" -O2 "$HERE/cxx20.cpp" -o "$OUT/cxx20"
 "$CXX" -O2 -shared-libc++ "$HERE/cxx20.cpp" -o "$OUT/cxx20-shared"
 "$CXX" -O2 -shared-libc++ -shared "$HERE/shape.cpp" -o "$OUT/libshape.so" -Wl,-soname,libshape.so

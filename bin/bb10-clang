@@ -174,7 +174,7 @@ def link(args, shared_cxx):
 def main():
     args = [a for a in sys.argv[1:] if a != "-shared-libc++"]
     shared_cxx = len(args) < len(sys.argv) - 1
-    if not args or any(a in ("-c", "-S", "-E", "-M", "-MM", "--version", "-v", "-dumpversion",
+    if not args or any(a in ("-c", "-S", "-E", "-M", "-MM", "-fsyntax-only", "--version", "-v", "-dumpversion",
                              "-dumpmachine") or a.startswith("-print-") for a in args):
         return clang(args)
     return link(args, shared_cxx)

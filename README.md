@@ -170,6 +170,7 @@ table is outside `PT_ARM_EXIDX`:
 
 | Test | Checks |
 |---|---|
+| `headers.c`, `headers.cpp` | the SDK's C and POSIX headers compile, twice over (include guards), in C and C++ (compile only) |
 | `cxx20` | concepts, `<=>`, `std::span`, `<bit>`, ranges, `<numbers>`, `<charconv>`, `<format>`, `source_location`, containers, `variant`/`optional`, RTTI, exceptions (nested too), `std::thread`, atomics (64-bit too), `thread_local`, mutexes, `condition_variable`, `jthread`/`stop_token`, `latch`/`barrier`/`semaphore`, `atomic::wait`, `call_once`, iostreams, `<regex>`, `<filesystem>` |
 | `cxx20-shared` | the same, with `-shared-libc++` |
 | `modules` + `libshape.so` | with `-shared-libc++`: virtual calls, RTTI, an exception thrown in a library and caught in the program by its base class, `thread_local` across the boundary |
