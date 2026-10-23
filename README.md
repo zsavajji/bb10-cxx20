@@ -192,6 +192,7 @@ table is outside `PT_ARM_EXIDX`:
 | `libc` | the libc functions `libbb10-cxx20-rt.a` adds |
 | `cxx20` | concepts, `<=>`, `std::span`, `<bit>`, ranges, `<numbers>`, `<charconv>`, `<format>`, `source_location`, containers, `variant`/`optional`, RTTI, exceptions (nested too), `std::thread`, atomics (64-bit too), `thread_local`, mutexes, `condition_variable`, `jthread`/`stop_token`, `latch`/`barrier`/`semaphore`, `atomic::wait`, `call_once`, iostreams, `<regex>`, `<filesystem>` |
 | `cxx20-shared` | the same, with `-shared-libc++` |
+| `exceptions` | throw and catch, each step named before it runs: in one function, through 6 frames with cleanups, a destructor while unwinding, `std::out_of_range` from libc++, rethrow, `exception_ptr` |
 | `modules` + `libshape.so` | with `-shared-libc++`: virtual calls, RTTI, an exception thrown in a library and caught in the program by its base class, `thread_local` across the boundary |
 | `dlopen` + `plugin.so` | a C program loads a C++ plugin with the static runtime, which uses exceptions inside. `dlclose()` runs the plugin's static destructors |
 | `cmake-test` | the CMake toolchain file: a C++20 program, a static and a shared library, `Threads::Threads` |
@@ -214,10 +215,13 @@ Each test prints one line per check and ends with `all passed` or `FAILED`.
 
 Everything builds and links. The checks above pass: every import is found on
 BB10, the unwind tables are complete, and the static runtime exports nothing.
-**The tests have not been run on a phone yet**, because QNX binaries cannot
-run anywhere else. The parts only a phone can confirm are exception
-unwinding (LLVM's libunwind finding tables through QNX's `dl_iterate_phdr`),
-emulated TLS, and `__cxa_finalize` on `dlclose`.
+
+**Every test passes on a phone** (MSM8960, OS 10.3.3), run from a .bar
+(bb10-webkit's test package). Before that, every test that threw crashed.
+libc++abi read the catch clauses' `R_ARM_TARGET2` type_info pointers as on
+Linux (GOT-relative), but armnto's `ld` writes them PC-relative, as QNX's
+GCC expects. `scripts/build-runtimes.sh` patches libc++abi to read them
+PC-relative on QNX.
 
 ## Limitations
 

@@ -62,6 +62,18 @@ if ! grep -q "hidden	__cxa_end_cleanup" "$ABI_EXC"; then
     grep -q "hidden	__cxa_end_cleanup" "$ABI_EXC"
 fi
 
+# The catch clauses' type_info pointers are R_ARM_TARGET2 relocations, whose
+# meaning each platform's linker chooses. libc++abi reads them as Linux's
+# (GOT-relative: one more dereference) unless bare metal; armnto's ld writes
+# them PC-relative, as QNX's GCC reads them. Read as on Linux, every catch
+# by type called through a type_info's vtable and jumped to an instruction
+# word (0xe92d4800).
+ABI_PERS="$SRC/libcxxabi/src/cxa_personality.cpp"
+if ! grep -q "LIBCXXABI_BAREMETAL) || defined(__QNX__)" "$ABI_PERS"; then
+    sed -i 's|^#if defined(LIBCXXABI_BAREMETAL)$|#if defined(LIBCXXABI_BAREMETAL) \|\| defined(__QNX__)|' "$ABI_PERS"
+    grep -q "LIBCXXABI_BAREMETAL) || defined(__QNX__)" "$ABI_PERS"
+fi
+
 # libbb10-cxx20-rt.a: emulated TLS (thread_local) and the atomic libcalls
 # from compiler-rt, on BB10's pthreads, __dso_handle, and the C11 and POSIX
 # 2008 functions libc++ needs that BB10's libc lacks (src-rt/).
