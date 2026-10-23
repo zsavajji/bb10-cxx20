@@ -39,6 +39,9 @@ Publishing a release also publishes that image to GitHub's registry
 docker pull ghcr.io/zsavajji/bb10-cxx20:latest
 ```
 
+Both images exist for x86-64 and ARM64 (XIAZY's image has both), so on an
+Apple Silicon Mac they run natively in Docker Desktop, OrbStack or Colima.
+
 **Prebuilt tarball.** `bb10-cxx20.tar.gz` is the `/opt/bb10-cxx20` that
 build produces. Unpack it into `/opt` of XIAZY's image (it needs that
 image's clang, binutils and SDK at their usual paths):
