@@ -1,0 +1,4 @@
+/out/
+/src/
+__pycache__/
+*.bundle

@@ -1,0 +1,183 @@
+#!/usr/bin/env python3
+"""C/C++20 driver for BlackBerry 10 (QNX 6.6, ARMv7 softfp).
+
+A gcc-compatible driver like XIAZY/blackberry10-toolchain's bb10-cc, whose
+target flags and link line it keeps, with a modern C++ instead of the SDK's
+C++98 Dinkumware library: invoked as bb10-clang++ it compiles C++20 (gnu++20
+unless -std is given) against LLVM libc++, and links libc++, libc++abi and
+libunwind statically, so programs ship no C++ runtime of their own.
+
+Compiles with clang for the bare-metal armv7-none-eabi triple plus the BB10
+sysroot flags (clang has no QNX driver) and links with the armnto GNU ld.
+Thread-local storage is emulated (__emutls_*, from libbb10-cxx20-rt.a): the
+QNX loader has no TLS segment.
+
+Environment:
+  QNX_TARGET          the BB10 SDK target (default /opt/bb10-sdk/target/qnx6)
+  BB10_CXX20          this toolchain's prefix (default: the folder above bin/)
+  BB10_CXX20_NOSTDLIB set while building the runtimes themselves: no libc++
+                      headers or C++ runtime libraries
+  BB10_CC_VERBOSE     print the commands
+
+Options of its own:
+  -shared-libc++      link libc++_shared.so (libc++, libc++abi and libunwind
+                      in one library, to ship in the app's lib/) instead of
+                      the static runtime: for programs made of several shared
+                      libraries that pass C++ objects or exceptions between them
+"""
+import os
+import subprocess
+import sys
+import tempfile
+
+TARGET = os.environ.get("QNX_TARGET", "/opt/bb10-sdk/target/qnx6")
+PREFIX = os.environ.get("BB10_CXX20",
+                        os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+BINUTILS = "/opt/bb10-toolchain/bin/arm-unknown-nto-qnx6.5.0eabi-"
+BUILTINS = "/opt/bb10-toolchain/lib/libclang_rt.builtins-armv7.a"
+OVERRIDE = "/opt/bb10-target-override/usr/include"
+LIB = TARGET + "/armle-v7/lib"
+USR_LIB = TARGET + "/armle-v7/usr/lib"
+CXX = os.path.basename(sys.argv[0]).endswith("++")
+NOSTDLIB = bool(os.environ.get("BB10_CXX20_NOSTDLIB"))
+VERBOSE = bool(os.environ.get("BB10_CC_VERBOSE"))
+
+
+def run(cmd):
+    if VERBOSE:
+        print(" ".join(cmd), file=sys.stderr)
+    return subprocess.call(cmd)
+
+
+def compile_flags(args):
+    resource = subprocess.run(["clang", "-print-resource-dir"], capture_output=True,
+                              text=True, check=True).stdout.strip()
+    flags = ["--target=armv7-none-eabi", "-fPIC", "-marm", "-mcpu=cortex-a9", "-mfpu=vfpv3-d16",
+             "-mfloat-abi=softfp", "-mno-unaligned-access", "-femulated-tls",
+             "-Wno-pragma-pack", "-Wno-unused-command-line-argument", "-fstack-protector",
+             "-D__ARM__", "-D__QNX__", "-D__QNXNTO__", "-D__unix__", "-D__unix",
+             "-D__LITTLEENDIAN__", "-D_QNX_SOURCE", "-nostdinc",
+             # The SDK's C99 declarations (fpclassify, FP_NAN, ...), which its
+             # headers otherwise show only to a compiler that defines _C99.
+             "-D_HAS_C9X=1"]
+    if CXX:
+        # libc++ brings its own C++ overloads of the C library; the SDK's
+        # (Dinkumware's) would clash with them.
+        flags += ["-nostdinc++", "-D_NO_CPP_INLINES"]
+        if not NOSTDLIB:
+            # libc++ wraps the C headers, so it comes before them.
+            flags += ["-isystem", PREFIX + "/include/c++/v1",
+                      # std::jthread, std::stop_token and std::osyncstream,
+                      # which libc++ 19 still calls experimental (20 does not).
+                      "-D_LIBCPP_ENABLE_EXPERIMENTAL"]
+        if not any(a.startswith("-std=") for a in args):
+            flags.append("-std=gnu++20")
+    # Headers BB10 has under other names (<link.h>), then the SDK's.
+    flags += ["-isystem", resource + "/include", "-isystem", PREFIX + "/include/bb10-compat",
+              "-isystem", OVERRIDE, "-isystem", TARGET + "/usr/include"]
+    return flags
+
+
+def clang(args):
+    return run(["clang++" if CXX else "clang"] + compile_flags(args) + args)
+
+
+SOURCE_EXT = (".c", ".cc", ".cpp", ".cxx", ".c++", ".s", ".S")
+# Compile options whose value is the next argument.
+TWO_ARG = {"-isystem", "-include", "-I", "-iquote", "-idirafter", "-x", "-MF", "-MT", "-MQ",
+           "-Xclang", "-target", "-D", "-U"}
+# Options only gcc's own link step uses; nothing to do here.
+IGNORED_LINK = {"-pthread", "-no-pie", "-rdynamic", "-static-libstdc++", "-static-libgcc"}
+
+
+def link(args, shared_cxx):
+    # Objects, libraries and linker options stay in command-line order, which
+    # matters for pairs like -Wl,--whole-archive lib.a -Wl,--no-whole-archive.
+    out, inputs, search, cflags, sources = "a.out", [], [], [], []
+    shared = False
+    nocxx = NOSTDLIB
+    nort = False
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a == "-o":
+            out = args[i + 1]
+            i += 1
+        elif a.startswith("-Wl,"):
+            inputs += a[4:].split(",")
+        elif a == "-Xlinker":
+            inputs.append(args[i + 1])
+            i += 1
+        elif a.startswith("-L"):
+            search.append(a if len(a) > 2 else "-L" + args[i + 1])
+            i += 0 if len(a) > 2 else 1
+        elif a.startswith("-l"):
+            inputs.append(a if len(a) > 2 else "-l" + args[i + 1])
+            i += 0 if len(a) > 2 else 1
+        elif a == "-shared":
+            shared = True
+        elif a == "-nostdlib++":
+            nocxx = True
+        elif a in ("-nostdlib", "-nodefaultlibs"):
+            nocxx = nort = True
+        elif a in IGNORED_LINK:
+            if a == "-rdynamic":
+                inputs.append("--export-dynamic")
+        elif a in ("-s", "-S"):
+            inputs.append(a)
+        elif a in TWO_ARG and i + 1 < len(args):
+            cflags += [a, args[i + 1]]
+            i += 1
+        elif a.endswith(SOURCE_EXT) and not a.startswith("-"):
+            sources.append(a)
+            inputs.append(len(sources) - 1)  # its object, once compiled
+        elif a.startswith("-"):
+            cflags.append(a)
+        else:
+            inputs.append(a)
+        i += 1
+
+    with tempfile.TemporaryDirectory() as tmp:
+        for n, src in enumerate(sources):
+            obj = os.path.join(tmp, "src%d.o" % n)
+            if clang(cflags + ["-c", src, "-o", obj]) != 0:
+                return 1
+            inputs[inputs.index(n)] = obj
+        common = ["-m", "armnto", "-z", "noexecstack", "-rpath-link", LIB, "-rpath-link", USR_LIB] + search + [
+                  "-L" + LIB, "-L" + USR_LIB, "-L" + PREFIX + "/lib",
+                  # The ARM unwind tables, which the armnto script leaves out.
+                  "-T", PREFIX + "/share/bb10-exidx.ld"]
+        if nocxx or not CXX:
+            cxx = []
+        elif shared_cxx:
+            cxx = ["-lc++_shared", "-lc++experimental"]
+        else:
+            cxx = ["-lc++", "-lc++experimental", "-lc++abi", "-lunwind"]
+        # Emulated TLS, atomics and the libc additions. Absent only while it
+        # is being built.
+        rt_lib = PREFIX + "/lib/libbb10-cxx20-rt.a"
+        rt = [] if nort or not os.path.exists(rt_lib) else [rt_lib]
+        # Searched as a group, since these libraries refer to each other.
+        group = ["--start-group"] + cxx + rt + ["-lm", "-lc", BUILTINS, "--end-group"]
+        if shared:
+            cmd = [BINUTILS + "ld", "-shared"] + common + ["-o", out] + inputs + group
+        else:
+            # Emulated TLS and the atomic libcalls keep tables that must be one
+            # per process: shared libraries bind to the executable's copy.
+            cmd = ([BINUTILS + "ld", "--dynamic-linker", "/usr/lib/ldqnx.so.2", "--hash-style=sysv",
+                    "--export-dynamic-symbol=__emutls_get_address", "--export-dynamic-symbol=__atomic_*"]
+                   + common + ["-o", out, LIB + "/crt1.o", LIB + "/crti.o"]
+                   + inputs + group + [LIB + "/crtn.o"])
+        return run(cmd)
+
+
+def main():
+    args = [a for a in sys.argv[1:] if a != "-shared-libc++"]
+    shared_cxx = len(args) < len(sys.argv) - 1
+    if not args or any(a in ("-c", "-S", "-E", "-M", "-MM", "--version", "-v", "-dumpversion",
+                             "-dumpmachine") or a.startswith("-print-") for a in args):
+        return clang(args)
+    return link(args, shared_cxx)
+
+
+sys.exit(main())
