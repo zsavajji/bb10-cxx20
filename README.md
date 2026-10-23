@@ -78,11 +78,12 @@ Autotools and plain Makefiles: `CC=bb10-clang CXX=bb10-clang++`, and
 `--host=arm-unknown-nto-qnx6.5.0eabi` for configure scripts. Autoconf's
 C++11 check fails under C++20 (its test assigns a `u8""` literal to
 `const char *`, which C++20's `char8_t` forbids) and then appends
-`-std=gnu++11` to `CXX`. Tell configure the compiler needs nothing:
+`-std=gnu++11` to `CXX`. Tell configure the compiler needs nothing (an
+empty value means "none needed"):
 
 ```sh
 ./configure --host=arm-unknown-nto-qnx6.5.0eabi CC=bb10-clang CXX=bb10-clang++ \
-    ac_cv_prog_cxx_cxx11='none needed' ac_cv_prog_cxx_cxx98='none needed'
+    ac_cv_prog_cxx_cxx11=
 ```
 
 Environment: `BB10_CC_VERBOSE=1` prints the clang and ld command lines;
