@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <malloc.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -261,4 +262,13 @@ int madvise(void *addr, size_t len, int advice)
         return -1;
     }
     return 0;
+}
+
+/* glibc's name for the usable size of a heap block; QNX calls it _msize()
+ * (in libc, not in its headers). */
+extern size_t _msize(void *);
+
+size_t malloc_usable_size(void *p)
+{
+    return p ? _msize(p) : 0;
 }

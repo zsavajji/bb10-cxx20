@@ -1,6 +1,7 @@
 /* The functions libbb10-cxx20-rt.a adds to BB10's libc. */
 #include <errno.h>
 #include <fcntl.h>
+#include <malloc.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,6 +27,9 @@ int main(void)
     char *buffer = NULL;
     check("asprintf", asprintf(&buffer, "%s %d", "OS", 10) == 5 && !strcmp(buffer, "OS 10"));
     free(buffer);
+    void *block = malloc(100);
+    check("malloc_usable_size", malloc_usable_size(block) >= 100 && malloc_usable_size(NULL) == 0);
+    free(block);
     void *aligned = aligned_alloc(4096, 4096);
     check("aligned_alloc", aligned && ((size_t)aligned & 4095) == 0);
     free(aligned);

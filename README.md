@@ -120,7 +120,7 @@ the two over a process boundary or a C interface.
 | `bin/bb10-clang` | The driver (Python; `bb10-clang++` is a symlink). It compiles with clang for `armv7-none-eabi` with BB10's flags (`-mcpu=cortex-a9 -mfpu=vfpv3-d16 -mfloat-abi=softfp -D__QNX__ …`), with libc++'s headers ahead of the SDK's. It links with the armnto `ld`: `crt1.o`/`crti.o`/`crtn.o`, the C++ runtime, `libbb10-cxx20-rt.a`, `libm`, `libc` and compiler-rt's builtins. |
 | `lib/libc++.a`, `libc++abi.a`, `libunwind.a` | The static runtime, hermetic. |
 | `lib/libc++_shared.so.1` | The shared runtime. |
-| `lib/libbb10-cxx20-rt.a` | What BB10 lacks and every program may need: compiler-rt's emulated TLS (`thread_local`) and atomic libcalls, `__dso_handle`, and libc functions QNX 6.6 lacks: `aligned_alloc`, `vasprintf`/`asprintf`, `getline`/`getdelim`, `memmem`, `memrchr`, `strchrnul`, `mkostemp`, `pipe2`, `dup3`, `madvise` (over `posix_madvise`), `wcsnlen`, `mbsnrtowcs`, `wcsnrtombs`. |
+| `lib/libbb10-cxx20-rt.a` | What BB10 lacks and every program may need: compiler-rt's emulated TLS (`thread_local`) and atomic libcalls, `__dso_handle`, and libc functions QNX 6.6 lacks: `aligned_alloc`, `vasprintf`/`asprintf`, `getline`/`getdelim`, `memmem`, `memrchr`, `strchrnul`, `mkostemp`, `pipe2`, `dup3`, `madvise` (over `posix_madvise`), `malloc_usable_size` (over `_msize`), `wcsnlen`, `mbsnrtowcs`, `wcsnrtombs`. |
 | `include/c++/v1` | libc++'s headers. |
 | `include/bb10-compat` | Small wrappers over SDK headers that libc++ trips on (below). |
 | `share/bb10-cxx20.cmake` | CMake toolchain file. |
@@ -146,9 +146,10 @@ in this repository:
   the C library in `namespace std` (and keep the SDK headers' include
   guards working in C++). `<math.h>` and `<wchar.h>` drop the function-like
   macros (`cos`, `log`, `wcstod`, …) that break libc++'s overloads, and
-  `<math.h>` the SDK's templates for mixed argument types. `<stdlib.h>`,
-  `<string.h>`, `<stdio.h>`, `<wchar.h>`, `<unistd.h>` and `<sys/mman.h>`
-  declare the functions `libbb10-cxx20-rt.a` adds (and `MADV_*`, as QNX 7
+  `<math.h>` the SDK's templates for mixed argument types. `<sys/platform.h>`
+  survives clang's `<stdbool.h>` coming first in C++. `<stdlib.h>`,
+  `<string.h>`, `<stdio.h>`, `<wchar.h>`, `<unistd.h>`, `<malloc.h>` and
+  `<sys/mman.h>` declare the functions `libbb10-cxx20-rt.a` adds (and `MADV_*`, as QNX 7
   has them). All of these, and the SDK's headers, are searched after the
   program's own `-I` and `-isystem` directories, so a library it brings
   (a newer ICU than the SDK's, say) takes precedence. `<strings.h>` is fixed for C++, and

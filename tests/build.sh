@@ -17,6 +17,8 @@ OUT=$(cd "$OUT" && pwd)
 # The SDK's headers, in C and in C++ (compile only).
 "$CC" -fsyntax-only "$HERE/headers.c"
 "$CXX" -fsyntax-only "$HERE/headers.cpp"
+# <stdbool.h> before the SDK's headers in C++ (clang defines _Bool there).
+printf '#include <stdbool.h>\n#include <stdint.h>\n#include <cstdint>\n' | "$CXX" -fsyntax-only -x c++ -
 # A program's -isystem directories come before the SDK's headers.
 "$CC" -fsyntax-only -isystem "$HERE/shadow" "$HERE/include-order.c"
 "$CXX" -fsyntax-only -isystem "$HERE/shadow" -x c++ "$HERE/include-order.c"
