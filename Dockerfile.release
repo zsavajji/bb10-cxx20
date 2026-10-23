@@ -7,7 +7,7 @@
 FROM ghcr.io/xiazy/blackberry10-toolchain@sha256:60ce49510a37ed92368cca010bbaabf97b12d209b9fab179e8491b266bb2578f
 
 ARG BB10_CXX20_RELEASE=v19.1.7-2
-ARG BB10_CXX20_SHA256=aa74ab3d7288b07614ad28c3c4e307fdf14e1b2b40bb14a170f73fecc3cfc7f2
+ARG BB10_CXX20_SHA256=06662a788ca6e7de0099535b57556cd1cb76ca6dfa5f88a4e1707010c0c0dd54
 ADD --checksum=sha256:${BB10_CXX20_SHA256} \
     https://github.com/zsavajji/bb10-cxx20/releases/download/${BB10_CXX20_RELEASE}/bb10-cxx20.tar.gz \
     /tmp/bb10-cxx20.tar.gz
