@@ -60,21 +60,27 @@ def compile_flags(args):
              # The SDK's C99 declarations (fpclassify, FP_NAN, ...), which its
              # headers otherwise show only to a compiler that defines _C99.
              "-D_HAS_C9X=1"]
+    includes = []
     if CXX:
         # libc++ brings its own C++ overloads of the C library; the SDK's
         # (Dinkumware's) would clash with them.
         flags += ["-nostdinc++", "-D_NO_CPP_INLINES"]
         if not NOSTDLIB:
             # libc++ wraps the C headers, so it comes before them.
-            flags += ["-isystem", PREFIX + "/include/c++/v1",
-                      # std::jthread, std::stop_token and std::osyncstream,
-                      # which libc++ 19 still calls experimental (20 does not).
-                      "-D_LIBCPP_ENABLE_EXPERIMENTAL"]
+            includes.append(PREFIX + "/include/c++/v1")
+            # std::jthread, std::stop_token and std::osyncstream, which
+            # libc++ 19 still calls experimental (20 does not).
+            flags.append("-D_LIBCPP_ENABLE_EXPERIMENTAL")
         if not any(a.startswith("-std=") for a in args):
             flags.append("-std=gnu++20")
-    # Headers BB10 has under other names (<link.h>), then the SDK's.
-    flags += ["-isystem", resource + "/include", "-isystem", PREFIX + "/include/bb10-compat",
-              "-isystem", OVERRIDE, "-isystem", TARGET + "/usr/include"]
+    # clang's own headers, the wrappers and additions in bb10-compat, then the
+    # SDK's. After the program's own -I and -isystem directories, so that a
+    # library it brings (a newer ICU, say) wins over the SDK's copy.
+    includes += [resource + "/include", PREFIX + "/include/bb10-compat", OVERRIDE, TARGET + "/usr/include"]
+    # (-idirafter: system directories searched last; with -nostdinc, clang
+    # ignores -isystem-after.)
+    for d in includes:
+        flags += ["-idirafter", d]
     return flags
 
 

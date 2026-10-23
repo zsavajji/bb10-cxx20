@@ -1,11 +1,15 @@
-/* POSIX 2008 / BSD functions that libc++ uses and BB10's libc (QNX 6.6)
- * does not have. Declared by include/bb10-compat/{stdio,wchar}.h. */
+/* POSIX 2008, BSD and GNU functions that libc++ and ported libraries use
+ * and BB10's libc (QNX 6.6) does not have. Declared by the wrappers in
+ * include/bb10-compat/. */
 #include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <unistd.h>
 #include <wchar.h>
 
 int vasprintf(char **out, const char *fmt, va_list ap)
@@ -120,4 +124,141 @@ size_t wcsnrtombs(char *dst, const wchar_t **src, size_t nwc, size_t len, mbstat
     if (dst)
         *src = s;
     return count;
+}
+
+void *memmem(const void *haystack, size_t haystack_len, const void *needle, size_t needle_len)
+{
+    const unsigned char *h = haystack;
+    if (!needle_len)
+        return (void *)h;
+    for (; haystack_len >= needle_len; ++h, --haystack_len) {
+        if (*h == *(const unsigned char *)needle && !memcmp(h, needle, needle_len))
+            return (void *)h;
+    }
+    return NULL;
+}
+
+void *memrchr(const void *s, int c, size_t n)
+{
+    const unsigned char *p = (const unsigned char *)s + n;
+    while (n--) {
+        if (*--p == (unsigned char)c)
+            return (void *)p;
+    }
+    return NULL;
+}
+
+char *strchrnul(const char *s, int c)
+{
+    while (*s && *s != (char)c)
+        ++s;
+    return (char *)s;
+}
+
+ssize_t getdelim(char **line, size_t *size, int delim, FILE *stream)
+{
+    size_t length = 0;
+    int c;
+    if (!line || !size) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!*line)
+        *size = 0;
+    while ((c = getc(stream)) != EOF) {
+        if (length + 2 > *size) {
+            size_t grown = *size ? *size * 2 : 128;
+            char *bigger = realloc(*line, grown);
+            if (!bigger)
+                return -1;
+            *line = bigger;
+            *size = grown;
+        }
+        (*line)[length++] = (char)c;
+        if (c == delim)
+            break;
+    }
+    if (!length)
+        return -1; /* end of file or error, nothing read */
+    (*line)[length] = '\0';
+    return (ssize_t)length;
+}
+
+ssize_t getline(char **line, size_t *size, FILE *stream)
+{
+    return getdelim(line, size, '\n', stream);
+}
+
+/* The descriptor flags, set after the descriptor exists: not atomic with a
+ * fork() in another thread, which QNX 6.6 offers no way to be. */
+static int set_fd_flags(int fd, int flags)
+{
+    if ((flags & O_CLOEXEC) && fcntl(fd, F_SETFD, FD_CLOEXEC) == -1)
+        return -1;
+    if (flags & ~O_CLOEXEC) {
+        int status = fcntl(fd, F_GETFL);
+        if (status == -1 || fcntl(fd, F_SETFL, status | (flags & ~O_CLOEXEC)) == -1)
+            return -1;
+    }
+    return 0;
+}
+
+int mkostemp(char *template, int flags)
+{
+    int fd = mkstemp(template);
+    if (fd != -1 && set_fd_flags(fd, flags) == -1) {
+        int error = errno;
+        close(fd);
+        unlink(template);
+        errno = error;
+        return -1;
+    }
+    return fd;
+}
+
+int pipe2(int fds[2], int flags)
+{
+    if (flags & ~(O_CLOEXEC | O_NONBLOCK)) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (pipe(fds) == -1)
+        return -1;
+    if (set_fd_flags(fds[0], flags) == -1 || set_fd_flags(fds[1], flags) == -1) {
+        int error = errno;
+        close(fds[0]);
+        close(fds[1]);
+        errno = error;
+        return -1;
+    }
+    return 0;
+}
+
+int dup3(int oldfd, int newfd, int flags)
+{
+    if (oldfd == newfd || (flags & ~O_CLOEXEC)) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (dup2(oldfd, newfd) == -1)
+        return -1;
+    if (set_fd_flags(newfd, flags) == -1) {
+        int error = errno;
+        close(newfd);
+        errno = error;
+        return -1;
+    }
+    return newfd;
+}
+
+/* QNX 7's madvise() over QNX 6.6's posix_madvise(), which returns the error
+ * instead of setting errno. */
+int madvise(void *addr, size_t len, int advice)
+{
+    int error = posix_madvise(addr, len, advice);
+    if (error) {
+        errno = error;
+        return -1;
+    }
+    return 0;
 }

@@ -17,6 +17,9 @@ OUT=$(cd "$OUT" && pwd)
 # The SDK's headers, in C and in C++ (compile only).
 "$CC" -fsyntax-only "$HERE/headers.c"
 "$CXX" -fsyntax-only "$HERE/headers.cpp"
+# A program's -isystem directories come before the SDK's headers.
+"$CC" -fsyntax-only -isystem "$HERE/shadow" "$HERE/include-order.c"
+"$CXX" -fsyntax-only -isystem "$HERE/shadow" -x c++ "$HERE/include-order.c"
 
 "$CXX" -O2 "$HERE/cxx20.cpp" -o "$OUT/cxx20"
 "$CXX" -O2 -shared-libc++ "$HERE/cxx20.cpp" -o "$OUT/cxx20-shared"
@@ -24,6 +27,7 @@ OUT=$(cd "$OUT" && pwd)
 "$CXX" -O2 -shared-libc++ "$HERE/modules.cpp" -o "$OUT/modules" -L"$OUT" -lshape
 "$CXX" -O2 -shared "$HERE/plugin.cpp" -o "$OUT/plugin.so"
 "$CC" -O2 "$HERE/dlopen.c" -o "$OUT/dlopen"
+"$CC" -O2 -Wall -Werror "$HERE/libc.c" -o "$OUT/libc"
 # A file under its SONAME: symlinks do not survive copying to the phone.
 cp "$TC/lib/libc++_shared.so.1" "$OUT/"
 
@@ -40,7 +44,7 @@ for lib in "$LIB/libc.so.3" "$LIB/libm.so.2" "$OUT/libc++_shared.so.1" "$OUT/lib
     "${B}nm" -D --defined-only "$lib" | awk '{ print $3 }'
 done | sort -u >"$defined"
 status=0
-for f in cxx20 cxx20-shared modules dlopen cmake-test libshape.so plugin.so libc++_shared.so.1; do
+for f in cxx20 cxx20-shared modules dlopen libc cmake-test libshape.so plugin.so libc++_shared.so.1; do
     missing=$("${B}nm" -D --undefined-only "$OUT/$f" | awk '$1 == "U" { print $2 }' | sort -u | comm -23 - "$defined")
     if [ -n "$missing" ]; then
         echo "$f: not on BB10: $missing"

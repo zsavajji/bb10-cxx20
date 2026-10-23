@@ -120,7 +120,7 @@ the two over a process boundary or a C interface.
 | `bin/bb10-clang` | The driver (Python; `bb10-clang++` is a symlink). It compiles with clang for `armv7-none-eabi` with BB10's flags (`-mcpu=cortex-a9 -mfpu=vfpv3-d16 -mfloat-abi=softfp -D__QNX__ …`), with libc++'s headers ahead of the SDK's. It links with the armnto `ld`: `crt1.o`/`crti.o`/`crtn.o`, the C++ runtime, `libbb10-cxx20-rt.a`, `libm`, `libc` and compiler-rt's builtins. |
 | `lib/libc++.a`, `libc++abi.a`, `libunwind.a` | The static runtime, hermetic. |
 | `lib/libc++_shared.so.1` | The shared runtime. |
-| `lib/libbb10-cxx20-rt.a` | What BB10 lacks and every program may need: compiler-rt's emulated TLS (`thread_local`) and atomic libcalls, `__dso_handle`, and `aligned_alloc`, `vasprintf`/`asprintf`, `wcsnlen`, `mbsnrtowcs`, `wcsnrtombs`. |
+| `lib/libbb10-cxx20-rt.a` | What BB10 lacks and every program may need: compiler-rt's emulated TLS (`thread_local`) and atomic libcalls, `__dso_handle`, and libc functions QNX 6.6 lacks: `aligned_alloc`, `vasprintf`/`asprintf`, `getline`/`getdelim`, `memmem`, `memrchr`, `strchrnul`, `mkostemp`, `pipe2`, `dup3`, `madvise` (over `posix_madvise`), `wcsnlen`, `mbsnrtowcs`, `wcsnrtombs`. |
 | `include/c++/v1` | libc++'s headers. |
 | `include/bb10-compat` | Small wrappers over SDK headers that libc++ trips on (below). |
 | `share/bb10-cxx20.cmake` | CMake toolchain file. |
@@ -146,9 +146,12 @@ in this repository:
   the C library in `namespace std` (and keep the SDK headers' include
   guards working in C++). `<math.h>` and `<wchar.h>` drop the function-like
   macros (`cos`, `log`, `wcstod`, …) that break libc++'s overloads, and
-  `<math.h>` the SDK's templates for mixed argument types; `<stdlib.h>`,
-  `<wchar.h>` and `<stdio.h>` declare the functions `libbb10-cxx20-rt.a`
-  adds. `<strings.h>` is fixed for C++, and
+  `<math.h>` the SDK's templates for mixed argument types. `<stdlib.h>`,
+  `<string.h>`, `<stdio.h>`, `<wchar.h>`, `<unistd.h>` and `<sys/mman.h>`
+  declare the functions `libbb10-cxx20-rt.a` adds (and `MADV_*`, as QNX 7
+  has them). All of these, and the SDK's headers, are searched after the
+  program's own `-I` and `-isystem` directories, so a library it brings
+  (a newer ICU than the SDK's, say) takes precedence. `<strings.h>` is fixed for C++, and
   `<langinfo.h>` is a stub. `-D_HAS_C9X=1` shows the SDK's C99 math
   (`fpclassify`, `FP_NAN`), and `-D_NO_CPP_INLINES` hides its C++ overloads.
 - **Exception tables.** The armnto linker script in XIAZY's binutils (2.45)
@@ -181,6 +184,8 @@ table is outside `PT_ARM_EXIDX`:
 | Test | Checks |
 |---|---|
 | `headers.c`, `headers.cpp` | the SDK's C and POSIX headers compile, twice over (include guards), in C and C++ (compile only) |
+| `include-order.c` | a program's `-isystem` directory comes before the SDK's headers (compile only) |
+| `libc` | the libc functions `libbb10-cxx20-rt.a` adds |
 | `cxx20` | concepts, `<=>`, `std::span`, `<bit>`, ranges, `<numbers>`, `<charconv>`, `<format>`, `source_location`, containers, `variant`/`optional`, RTTI, exceptions (nested too), `std::thread`, atomics (64-bit too), `thread_local`, mutexes, `condition_variable`, `jthread`/`stop_token`, `latch`/`barrier`/`semaphore`, `atomic::wait`, `call_once`, iostreams, `<regex>`, `<filesystem>` |
 | `cxx20-shared` | the same, with `-shared-libc++` |
 | `modules` + `libshape.so` | with `-shared-libc++`: virtual calls, RTTI, an exception thrown in a library and caught in the program by its base class, `thread_local` across the boundary |
