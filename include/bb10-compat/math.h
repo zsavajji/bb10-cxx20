@@ -1,7 +1,15 @@
 /* BB10's <math.h>, outside its own C++ branch (which libc++ replaces),
  * defines cos(), sin(), log() and their variants as macros over internal
  * helpers. The real functions are declared too; libc++ declares its
- * overloads under these names, so the macros go in C++. */
+ * overloads under these names, so the macros go in C++.
+ *
+ * Its <xtgmath.h> also declares templates for mixed argument types, such as
+ * fmod(double, int), which make those calls ambiguous next to libc++'s own;
+ * _HAS_GENERIC_TEMPLATES 0 is the SDK's switch for leaving them out. */
+#if defined(__cplusplus) && !defined(_HAS_GENERIC_TEMPLATES)
+# define _HAS_GENERIC_TEMPLATES	0
+#endif
+
 #include_next <math.h>
 
 #if defined(__cplusplus)
