@@ -2,12 +2,12 @@
 # /opt/bb10-cxx20 from GitHub, checked against its sha256): the same image
 # as the Dockerfile's, without building LLVM's runtimes.
 #
-#   docker build -f Dockerfile.release -t bb10-cxx20:19.1.7-1 .
-#   docker run --rm -v "$PWD:/src" -w /src bb10-cxx20:19.1.7-1 bb10-clang++ -O2 app.cpp -o app
+#   docker build -f Dockerfile.release -t bb10-cxx20:19.1.7-2 .
+#   docker run --rm -v "$PWD:/src" -w /src bb10-cxx20:19.1.7-2 bb10-clang++ -O2 app.cpp -o app
 FROM ghcr.io/xiazy/blackberry10-toolchain@sha256:60ce49510a37ed92368cca010bbaabf97b12d209b9fab179e8491b266bb2578f
 
-ARG BB10_CXX20_RELEASE=v19.1.7-1
-ARG BB10_CXX20_SHA256=8325429317c113eaf91f65a01750b69f95a5ef7988e5f87aa9002e403ed06d6a
+ARG BB10_CXX20_RELEASE=v19.1.7-2
+ARG BB10_CXX20_SHA256=aa74ab3d7288b07614ad28c3c4e307fdf14e1b2b40bb14a170f73fecc3cfc7f2
 ADD --checksum=sha256:${BB10_CXX20_SHA256} \
     https://github.com/zsavajji/bb10-cxx20/releases/download/${BB10_CXX20_RELEASE}/bb10-cxx20.tar.gz \
     /tmp/bb10-cxx20.tar.gz
