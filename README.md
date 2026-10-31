@@ -29,7 +29,7 @@ minutes.
 release's tarball (checked against its sha256), without building anything:
 
 ```sh
-docker build -f Dockerfile.release -t bb10-cxx20:19.1.7-2 .
+docker build -f Dockerfile.release -t bb10-cxx20:19.1.7-3 .
 ```
 
 Publishing a release also publishes that image to GitHub's registry
