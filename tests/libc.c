@@ -7,6 +7,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <wchar.h>
 
 static int failures;
 
@@ -34,6 +35,23 @@ int main(void)
     void *aligned = aligned_alloc(4096, 4096);
     check("aligned_alloc", aligned && ((size_t)aligned & 4095) == 0);
     free(aligned);
+
+    /* A multibyte character cut by the byte limit stays in the state, and the
+     * next call finishes it. Only where the locale's encoding is UTF-8. */
+    const char utf8[] = "a\xc3\xa9z";
+    const char *next = utf8;
+    wchar_t wide[4], probed;
+    mbstate_t state;
+    memset(&state, 0, sizeof state);
+    if (mbrtowc(&probed, utf8 + 1, 2, &state) == 2) {
+        memset(&state, 0, sizeof state);
+        size_t head = mbsnrtowcs(wide, &next, 2, 4, &state);
+        size_t tail = head == 1 ? mbsnrtowcs(wide + 1, &next, (size_t)(utf8 + 4 - next), 3, &state) : 0;
+        check("mbsnrtowcs, split character", head == 1 && tail == 2 && next == utf8 + 4
+                && wide[0] == L'a' && wide[1] == 0xe9 && wide[2] == L'z');
+    } else {
+        printf("%-28s skipped (not UTF-8)\n", "mbsnrtowcs");
+    }
 
     const char *tmpdir = getenv("TMPDIR");
     char template[512];

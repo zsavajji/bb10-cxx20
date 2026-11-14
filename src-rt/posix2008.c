@@ -68,8 +68,10 @@ size_t mbsnrtowcs(wchar_t *dst, const char **src, size_t nms, size_t len, mbstat
                 *src = s;
             return (size_t)-1;
         }
-        if (r == (size_t)-2) /* incomplete within nms: stop, state kept */
+        if (r == (size_t)-2) { /* incomplete within nms: the state holds its bytes */
+            s += nms;
             break;
+        }
         if (r == 0) { /* the terminating null */
             if (dst) {
                 dst[count] = L'\0';
