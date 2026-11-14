@@ -26,6 +26,7 @@ Options of its own:
                       libraries that pass C++ objects or exceptions between them
 """
 import os
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -60,6 +61,12 @@ def compile_flags(args):
              # The SDK's C99 declarations (fpclassify, FP_NAN, ...), which its
              # headers otherwise show only to a compiler that defines _C99.
              "-D_HAS_C9X=1"]
+    # For a bare-metal triple clang keeps frame pointers even when optimising;
+    # QNX's GCC drops them. (Unwinding reads the EHABI tables, not r11.)
+    # Before the program's own flags, so -fno-omit-frame-pointer still wins.
+    levels = [a for a in args if a.startswith("-O")]
+    if levels and levels[-1] not in ("-O0", "-Og"):
+        flags.append("-fomit-frame-pointer")
     includes = []
     if CXX:
         # libc++ brings its own C++ overloads of the C library; the SDK's
@@ -177,9 +184,25 @@ def link(args, shared_cxx):
         return run(cmd)
 
 
+def expand(args):
+    # @file: more arguments, read from a response file, as gcc and clang take
+    # them (CMake's Ninja generator links through one when the line is long).
+    # ponytail: the expanded line still has to fit the kernel's argument
+    # limit (about 2 MB); hand ld a response file of its own if it ever does not.
+    out = []
+    for a in args:
+        if a.startswith("@") and os.path.isfile(a[1:]):
+            with open(a[1:]) as f:
+                out += expand(shlex.split(f.read()))
+        else:
+            out.append(a)
+    return out
+
+
 def main():
-    args = [a for a in sys.argv[1:] if a != "-shared-libc++"]
-    shared_cxx = len(args) < len(sys.argv) - 1
+    argv = expand(sys.argv[1:])
+    args = [a for a in argv if a != "-shared-libc++"]
+    shared_cxx = len(args) < len(argv)
     # -v alone asks for the version; with other arguments it only makes the
     # driver verbose (CMake links with -v to learn the implicit libraries).
     if not args or args == ["-v"] or any(a in ("-c", "-S", "-E", "-M", "-MM", "-fsyntax-only", "--version",
