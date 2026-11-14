@@ -32,6 +32,9 @@ printf '#include <stdbool.h>\n#include <stdint.h>\n#include <cstdint>\n' | "$CXX
 "$CC" -O2 -Wall -Werror "$HERE/libc.c" -o "$OUT/libc"
 # Exceptions, step by step.
 "$CXX" -O2 "$HERE/exceptions.cpp" -o "$OUT/exceptions"
+# With an SDK library that exports libgcc's unwinder ahead of the C++ runtime.
+"$CXX" -O2 "$HERE/exceptions.cpp" -lz -o "$OUT/exceptions-z"
+"$CXX" -O2 -shared-libc++ "$HERE/exceptions.cpp" -lz -o "$OUT/exceptions-z-shared"
 # A file under its SONAME: symlinks do not survive copying to the phone.
 cp "$TC/lib/libc++_shared.so.1" "$OUT/"
 
@@ -48,7 +51,7 @@ for lib in "$LIB/libc.so.3" "$LIB/libm.so.2" "$OUT/libc++_shared.so.1" "$OUT/lib
     "${B}nm" -D --defined-only "$lib" | awk '{ print $3 }'
 done | sort -u >"$defined"
 status=0
-for f in cxx20 cxx20-shared modules dlopen libc exceptions cmake-test libshape.so plugin.so libc++_shared.so.1; do
+for f in cxx20 cxx20-shared modules dlopen libc exceptions exceptions-z exceptions-z-shared cmake-test libshape.so plugin.so libc++_shared.so.1; do
     missing=$("${B}nm" -D --undefined-only "$OUT/$f" | awk '$1 == "U" { print $2 }' | sort -u | comm -23 - "$defined")
     if [ -n "$missing" ]; then
         echo "$f: not on BB10: $missing"
@@ -59,6 +62,20 @@ for f in cxx20 cxx20-shared modules dlopen libc exceptions cmake-test libshape.s
         echo "$f: stray .ARM.exidx.* sections"
         status=1
     fi
+    # The unwinder is this toolchain's, not the libgcc one SDK libraries export:
+    # linked in with the static runtime, else from libc++_shared.so, loaded first.
+    needed=$("${B}readelf" -d "$OUT/$f" | awk '/NEEDED/ { print $NF }')
+    case $needed in
+    "[libc++_shared.so.1]"*) ;;
+    *libc++_shared*)
+        echo "$f: libc++_shared.so.1 is not the first library needed"
+        status=1 ;;
+    *)
+        if "${B}nm" -D --undefined-only "$OUT/$f" | grep -q '_Unwind_\|__gnu_unwind'; then
+            echo "$f: imports the unwinder"
+            status=1
+        fi ;;
+    esac
 done
 rm -f "$defined"
 cp "$HERE/run-tests.sh" "$OUT/"

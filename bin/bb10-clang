@@ -160,12 +160,18 @@ def link(args, shared_cxx):
                   "-L" + LIB, "-L" + USR_LIB, "-L" + PREFIX + "/lib",
                   # The ARM unwind tables, which the armnto script leaves out.
                   "-T", PREFIX + "/share/bb10-exidx.ld"]
+        # The unwinder goes ahead of the program's libraries: many of the SDK's
+        # (libz, libscreen, liblzma, ...) export libgcc's _Unwind_*, and one
+        # named first would otherwise supply it, to a libc++abi it crashes.
         if nocxx or not CXX:
-            cxx = []
+            first, cxx = [], []
         elif shared_cxx:
-            cxx = ["-lc++_shared", "-lc++experimental"]
+            # First among the needed libraries, which the loader searches in order.
+            first, cxx = ["-lc++_shared"], ["-lc++experimental"]
         else:
-            cxx = ["-lc++", "-lc++experimental", "-lc++abi", "-lunwind"]
+            # Whole, so that no _Unwind_* is left for a shared library to define.
+            first = ["--whole-archive", PREFIX + "/lib/libunwind.a", "--no-whole-archive"]
+            cxx = ["-lc++", "-lc++experimental", "-lc++abi"]
         # Emulated TLS, atomics and the libc additions. Absent only while it
         # is being built.
         rt_lib = PREFIX + "/lib/libbb10-cxx20-rt.a"
@@ -173,14 +179,14 @@ def link(args, shared_cxx):
         # Searched as a group, since these libraries refer to each other.
         group = ["--start-group"] + cxx + rt + ["-lm", "-lc", BUILTINS, "--end-group"]
         if shared:
-            cmd = [BINUTILS + "ld", "-shared"] + common + ["-o", out] + inputs + group
+            cmd = [BINUTILS + "ld", "-shared"] + common + ["-o", out] + first + inputs + group
         else:
             # Emulated TLS and the atomic libcalls keep tables that must be one
             # per process: shared libraries bind to the executable's copy.
             cmd = ([BINUTILS + "ld", "--dynamic-linker", "/usr/lib/ldqnx.so.2", "--hash-style=sysv",
                     "--export-dynamic-symbol=__emutls_get_address", "--export-dynamic-symbol=__atomic_*"]
                    + common + ["-o", out, LIB + "/crt1.o", LIB + "/crti.o"]
-                   + inputs + group + [LIB + "/crtn.o"])
+                   + first + inputs + group + [LIB + "/crtn.o"])
         return run(cmd)
 
 

@@ -164,6 +164,13 @@ in this repository:
   the unwinder reads, and exceptions could not unwind through those
   functions. `share/bb10-exidx.ld` adds the standard ARM rules to every link
   (`INSERT AFTER .rodata1`). `tests/build.sh` checks for this.
+- **The unwinder ahead of the program's libraries.** libz, libscreen, liblzma
+  and more of the SDK's shared libraries (19 in all, libc and libm among them) export the libgcc unwinder
+  (`_Unwind_*`) linked into them. Named before the C++ runtime, as `-lz`
+  always is, one of them supplied the unwinder instead of `libunwind.a`, and
+  the first `throw` crashed. The driver links `libunwind.a` whole, before the
+  program's objects and libraries (or `libc++_shared.so` first, so the loader
+  searches it first). `tests/build.sh` checks for this.
 - **`__dso_handle`**, which GCC's `crtbegin.o` normally defines, is in
   `libbb10-cxx20-rt.a`, one hidden copy per module. A shared library runs
   its static destructors from `__cxa_finalize` when it is unloaded, as with
@@ -193,6 +200,7 @@ table is outside `PT_ARM_EXIDX`:
 | `cxx20` | concepts, `<=>`, `std::span`, `<bit>`, ranges, `<numbers>`, `<charconv>`, `<format>`, `source_location`, containers, `variant`/`optional`, RTTI, exceptions (nested too), `std::thread`, atomics (64-bit too), `thread_local`, mutexes, `condition_variable`, `jthread`/`stop_token`, `latch`/`barrier`/`semaphore`, `atomic::wait`, `call_once`, iostreams, `<regex>`, `<filesystem>` |
 | `cxx20-shared` | the same, with `-shared-libc++` |
 | `exceptions` | throw and catch, each step named before it runs: in one function, through 6 frames with cleanups, a destructor while unwinding, `std::out_of_range` from libc++, rethrow, `exception_ptr` |
+| `exceptions-z`, `exceptions-z-shared` | the same, linked with `-lz` (an SDK library that exports libgcc's unwinder), with the static runtime and with `-shared-libc++` |
 | `modules` + `libshape.so` | with `-shared-libc++`: virtual calls, RTTI, an exception thrown in a library and caught in the program by its base class, `thread_local` across the boundary |
 | `dlopen` + `plugin.so` | a C program loads a C++ plugin with the static runtime, which uses exceptions inside. `dlclose()` runs the plugin's static destructors |
 | `cmake-test` | the CMake toolchain file: a C++20 program, a static and a shared library, `Threads::Threads` |
