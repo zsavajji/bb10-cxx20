@@ -29,7 +29,7 @@ minutes.
 release's tarball (checked against its sha256), without building anything:
 
 ```sh
-docker build -f Dockerfile.release -t bb10-cxx20:19.1.7-3 .
+docker build -f Dockerfile.release -t bb10-cxx20:19.1.7-4 .
 ```
 
 Publishing a release also publishes that image to GitHub's registry
@@ -230,6 +230,9 @@ libc++abi read the catch clauses' `R_ARM_TARGET2` type_info pointers as on
 Linux (GOT-relative), but armnto's `ld` writes them PC-relative, as QNX's
 GCC expects. `scripts/build-runtimes.sh` patches libc++abi to read them
 PC-relative on QNX.
+
+`exceptions-z` and `exceptions-z-shared` are newer than that run, and have
+not been run on a phone yet.
 
 ## Limitations
 
