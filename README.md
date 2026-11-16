@@ -123,7 +123,7 @@ the two over a process boundary or a C interface.
 | `bin/bb10-clang` | The driver (Python; `bb10-clang++` is a symlink). It compiles with clang for `armv7-none-eabi` with BB10's flags (`-mcpu=cortex-a9 -mfpu=vfpv3-d16 -mfloat-abi=softfp -D__QNX__ …`), with libc++'s headers ahead of the SDK's. It links with the armnto `ld`: `crt1.o`/`crti.o`/`crtn.o`, the C++ runtime, `libbb10-cxx20-rt.a`, `libm`, `libc` and compiler-rt's builtins. |
 | `lib/libc++.a`, `libc++abi.a`, `libunwind.a` | The static runtime, hermetic. |
 | `lib/libc++_shared.so.1` | The shared runtime. |
-| `lib/libbb10-cxx20-rt.a` | What BB10 lacks and every program may need: compiler-rt's emulated TLS (`thread_local`) and atomic libcalls, `__dso_handle`, and libc functions QNX 6.6 lacks: `aligned_alloc`, `vasprintf`/`asprintf`, `getline`/`getdelim`, `memmem`, `memrchr`, `strchrnul`, `mkostemp`, `pipe2`, `dup3`, `madvise` (over `posix_madvise`), `malloc_usable_size` (over `_msize`), `wcsnlen`, `mbsnrtowcs`, `wcsnrtombs`. |
+| `lib/libbb10-cxx20-rt.a` | What BB10 lacks and every program may need: emulated TLS (`thread_local`, `src-rt/emutls.c`) and compiler-rt's atomic libcalls, `__dso_handle`, and libc functions QNX 6.6 lacks: `aligned_alloc`, `vasprintf`/`asprintf`, `getline`/`getdelim`, `memmem`, `memrchr`, `strchrnul`, `mkostemp`, `pipe2`, `dup3`, `madvise` (over `posix_madvise`), `malloc_usable_size` (over `_msize`), `wcsnlen`, `mbsnrtowcs`, `wcsnrtombs`. |
 | `include/c++/v1` | libc++'s headers. |
 | `include/bb10-compat` | Small wrappers over SDK headers that libc++ trips on (below). |
 | `share/bb10-cxx20.cmake` | CMake toolchain file. |
@@ -180,7 +180,15 @@ in this repository:
   default visibility and executables export them, so shared libraries bind
   to one copy.
 - **Thread-local storage** is emulated (`-femulated-tls`): QNX 6.6's loader
-  has no ELF TLS. A `thread_local` access is a function call.
+  has no ELF TLS, so a `thread_local` access calls `__emutls_get_address`.
+  `src-rt/emutls.c` is compiler-rt's emutls rewritten for QNX, with the same
+  ABI. When the variable is already allocated in the thread it makes no call,
+  lock or barrier (compiler-rt's took an acquire barrier and called
+  `pthread_getspecific()` through the PLT): it reads the thread's array from
+  `_cpupage_ptr->tls`, as libc's `__tls()` does. A thread's variables are
+  freed in the last round of its key destructors, after the destructors of
+  its `thread_local` objects (libc++abi runs them from a key made later).
+  `tests/tlsbench` measures it.
 - libc++'s **experimental features are on** (`-D_LIBCPP_ENABLE_EXPERIMENTAL`),
   which in libc++ 19 means `std::jthread`, `std::stop_token` and
   `std::osyncstream`. libc++ 20 no longer marks them experimental.
@@ -203,6 +211,7 @@ table is outside `PT_ARM_EXIDX`:
 | `exceptions-z`, `exceptions-z-shared` | the same, linked with `-lz` (an SDK library that exports libgcc's unwinder), with the static runtime and with `-shared-libc++` |
 | `modules` + `libshape.so` | with `-shared-libc++`: virtual calls, RTTI, an exception thrown in a library and caught in the program by its base class, `thread_local` across the boundary |
 | `dlopen` + `plugin.so` | a C program loads a C++ plugin with the static runtime, which uses exceptions inside. `dlclose()` runs the plugin's static destructors |
+| `tlsbench` | `thread_local`: ns per access in the main thread and in two threads, against a global; per-thread values, alignment 16, a constructor and a destructor, 100 variables (the thread's array grows), 80 threads that exit, destructors run before the thread's variables are freed |
 | `cmake-test` | the CMake toolchain file: a C++20 program, a static and a shared library, `Threads::Threads` |
 
 On the phone, copy the folder (`/opt/bb10-cxx20/tests` in the image or the
@@ -234,6 +243,12 @@ PC-relative on QNX.
 `exceptions-z` and `exceptions-z-shared` are newer than that run, and have
 not been run on a phone yet.
 
+`tlsbench` passes on a phone (OS 10.3.3, 2026-11-16, run as a plain
+executable): 33 ns per `thread_local` access, against 66 ns with compiler-rt's
+emutls. Built with that older runtime it also fails its destructor checks:
+the destructors of a thread's `thread_local` objects did not run at thread
+exit.
+
 ## Limitations
 
 - **"C" locale only.** `std::locale("")` and named locales throw; UTF-8
@@ -242,7 +257,8 @@ not been run on a phone yet.
   floating point (libc++ 20).
 - File times in `<filesystem>` have one-second resolution, and
   `remove_all` works by path (no `openat`).
-- `thread_local` costs a function call per access (emulated TLS).
+- `thread_local` costs a call to `__emutls_get_address` per access (emulated
+  TLS), a short one: see `tests/tlsbench`.
 - XIAZY's driver adds `-lbps` to executables; this one does not. Add it if
   you use BPS.
 - ARM only (the phones). XIAZY's image also targets the x86 simulator; the

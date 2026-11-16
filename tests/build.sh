@@ -30,6 +30,8 @@ printf '#include <stdbool.h>\n#include <stdint.h>\n#include <cstdint>\n' | "$CXX
 "$CXX" -O2 -shared "$HERE/plugin.cpp" -o "$OUT/plugin.so"
 "$CC" -O2 "$HERE/dlopen.c" -o "$OUT/dlopen"
 "$CC" -O2 -Wall -Werror "$HERE/libc.c" -o "$OUT/libc"
+# thread_local: speed, and behaviour.
+"$CXX" -O2 "$HERE/tlsbench.cpp" -o "$OUT/tlsbench"
 # Exceptions, step by step.
 "$CXX" -O2 "$HERE/exceptions.cpp" -o "$OUT/exceptions"
 # With an SDK library that exports libgcc's unwinder ahead of the C++ runtime.
@@ -51,7 +53,7 @@ for lib in "$LIB/libc.so.3" "$LIB/libm.so.2" "$OUT/libc++_shared.so.1" "$OUT/lib
     "${B}nm" -D --defined-only "$lib" | awk '{ print $3 }'
 done | sort -u >"$defined"
 status=0
-for f in cxx20 cxx20-shared modules dlopen libc exceptions exceptions-z exceptions-z-shared cmake-test libshape.so plugin.so libc++_shared.so.1; do
+for f in cxx20 cxx20-shared modules dlopen libc tlsbench exceptions exceptions-z exceptions-z-shared cmake-test libshape.so plugin.so libc++_shared.so.1; do
     missing=$("${B}nm" -D --undefined-only "$OUT/$f" | awk '$1 == "U" { print $2 }' | sort -u | comm -23 - "$defined")
     if [ -n "$missing" ]; then
         echo "$f: not on BB10: $missing"

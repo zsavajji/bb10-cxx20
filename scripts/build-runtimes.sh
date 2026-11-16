@@ -2,7 +2,7 @@
 # Builds the C++20 runtime for BB10 into PREFIX (default /opt/bb10-cxx20):
 # LLVM libunwind, libc++abi and libc++, static, and all three in one
 # libc++_shared.so, plus libbb10-cxx20-rt.a
-# (compiler-rt's emulated TLS and atomic helpers, which the image's bare-metal
+# (emulated TLS, and compiler-rt's atomic helpers, which the image's bare-metal
 # builtins leave out). Runs inside XIAZY's blackberry10-toolchain image, with
 # the LLVM sources at SRC (an llvm-project tree holding at least cmake, llvm,
 # runtimes, libcxx, libcxxabi, libunwind and compiler-rt).
@@ -74,14 +74,13 @@ if ! grep -q "LIBCXXABI_BAREMETAL) || defined(__QNX__)" "$ABI_PERS"; then
     grep -q "LIBCXXABI_BAREMETAL) || defined(__QNX__)" "$ABI_PERS"
 fi
 
-# libbb10-cxx20-rt.a: emulated TLS (thread_local) and the atomic libcalls
-# from compiler-rt, on BB10's pthreads, __dso_handle, and the C11 and POSIX
-# 2008 functions libc++ needs that BB10's libc lacks (src-rt/).
+# libbb10-cxx20-rt.a: the atomic libcalls from compiler-rt, and from src-rt/
+# emulated TLS (thread_local: src-rt/emutls.c, written for QNX, instead of
+# compiler-rt's emutls.c), __dso_handle, and the C11 and POSIX 2008 functions
+# libc++ needs that BB10's libc lacks.
 rm -rf "$BUILD" && mkdir -p "$BUILD/rt"
-for f in emutls atomic; do
-    BB10_CXX20_NOSTDLIB=1 "$CC" -O2 -c "$SRC/compiler-rt/lib/builtins/$f.c" \
-        -o "$BUILD/rt/$f.o" -Wno-everything
-done
+BB10_CXX20_NOSTDLIB=1 "$CC" -O2 -c "$SRC/compiler-rt/lib/builtins/atomic.c" \
+    -o "$BUILD/rt/atomic.o" -Wno-everything
 for f in "$HERE"/src-rt/*.c; do
     BB10_CXX20_NOSTDLIB=1 "$CC" -O2 -Wall -Werror -c "$f" -o "$BUILD/rt/$(basename "$f" .c).o"
 done
