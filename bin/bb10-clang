@@ -37,6 +37,8 @@ PREFIX = os.environ.get("BB10_CXX20",
 BINUTILS = "/opt/bb10-toolchain/bin/arm-unknown-nto-qnx6.5.0eabi-"
 BUILTINS = "/opt/bb10-toolchain/lib/libclang_rt.builtins-armv7.a"
 OVERRIDE = "/opt/bb10-target-override/usr/include"
+# LLVM's linker plugin, which lets the armnto GNU ld link bitcode objects (-flto).
+LTO_PLUGIN = os.environ.get("BB10_LTO_PLUGIN", "/usr/lib/llvm-19/lib/LLVMgold.so")
 LIB = TARGET + "/armle-v7/lib"
 USR_LIB = TARGET + "/armle-v7/usr/lib"
 CXX = os.path.basename(sys.argv[0]).endswith("++")
@@ -103,6 +105,29 @@ TWO_ARG = {"-isystem", "-include", "-I", "-iquote", "-idirafter", "-x", "-MF", "
 IGNORED_LINK = {"-pthread", "-no-pie", "-rdynamic", "-static-libstdc++", "-static-libgcc"}
 
 
+def lto_flags(cflags):
+    """Linker options for link-time optimisation.
+
+    Objects compiled with -flto are LLVM bitcode. GNU ld hands them to LLVM's plugin, which
+    generates the code at link time. The bitcode carries each function's CPU features
+    (-mfpu, -mno-unaligned-access); the plugin must be told again what clang passes to the
+    code generator as options: the CPU, the optimisation level, emulated TLS (QNX 6.6 has
+    no ELF TLS) and sections per function, for --gc-sections.
+
+    The plugin is always loaded, so that bitcode objects link whether or not -flto is
+    repeated on the link line; it does nothing when every input is a native object.
+    """
+    if not os.path.exists(LTO_PLUGIN):
+        return []
+    thin = [a for a in cflags if a.startswith("-flto")][-1:] == ["-flto=thin"]
+    levels = [a[2:] for a in cflags if a.startswith("-O")]
+    level = {"0": "0", "1": "1", "3": "3", "fast": "3"}.get(levels[-1] if levels else "2", "2")
+    opts = ["mcpu=cortex-a9", "O" + level, "-emulated-tls", "-function-sections", "-data-sections"]
+    if thin:
+        opts += ["thinlto", "jobs=%d" % (os.cpu_count() or 1)]
+    return ["-plugin", LTO_PLUGIN] + ["-plugin-opt=" + o for o in opts]
+
+
 def link(args, shared_cxx):
     # Objects, libraries and linker options stay in command-line order, which
     # matters for pairs like -Wl,--whole-archive lib.a -Wl,--no-whole-archive.
@@ -160,6 +185,7 @@ def link(args, shared_cxx):
                   "-L" + LIB, "-L" + USR_LIB, "-L" + PREFIX + "/lib",
                   # The ARM unwind tables, which the armnto script leaves out.
                   "-T", PREFIX + "/share/bb10-exidx.ld"]
+        common += lto_flags(cflags)
         # The unwinder goes ahead of the program's libraries: many of the SDK's
         # (libz, libscreen, liblzma, ...) export libgcc's _Unwind_*, and one
         # named first would otherwise supply it, to a libc++abi it crashes.

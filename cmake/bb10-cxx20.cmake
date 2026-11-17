@@ -26,3 +26,11 @@ set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
+
+# Link-time optimisation (CMAKE_INTERPROCEDURAL_OPTIMIZATION, check_ipo_supported): CMake asks
+# for the compiler's own archiver. The armnto ar is it: the image puts LLVM's plugin where it
+# looks (lib/bfd-plugins), so it indexes archives of bitcode objects too.
+foreach(_lang C CXX)
+  set(CMAKE_${_lang}_COMPILER_AR "${_bb10_binutils}-ar" CACHE FILEPATH "archiver for LTO objects")
+  set(CMAKE_${_lang}_COMPILER_RANLIB "${_bb10_binutils}-ranlib" CACHE FILEPATH "ranlib for LTO objects")
+endforeach()

@@ -6,6 +6,12 @@
 #   docker run --rm -v "$PWD:/src" -w /src bb10-cxx20:19.1.7-4 bb10-clang++ -O2 app.cpp -o app
 FROM ghcr.io/xiazy/blackberry10-toolchain@sha256:60ce49510a37ed92368cca010bbaabf97b12d209b9fab179e8491b266bb2578f
 
+# Link-time optimisation: LLVM's linker plugin where the armnto ar, ranlib and nm look for
+# plugins, so that they index archives of -flto (bitcode) objects. The driver gives it to ld.
+RUN test -e /usr/lib/llvm-19/lib/LLVMgold.so \
+    && mkdir -p /opt/bb10-toolchain/lib/bfd-plugins \
+    && ln -sf /usr/lib/llvm-19/lib/LLVMgold.so /opt/bb10-toolchain/lib/bfd-plugins/LLVMgold.so
+
 ARG BB10_CXX20_RELEASE=v19.1.7-4
 ARG BB10_CXX20_SHA256=d6e2409ad8f7d906d1084f37bfdaeafaa1c601e2352fc39e356480df01ff0f55
 ADD --checksum=sha256:${BB10_CXX20_SHA256} \
