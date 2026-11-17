@@ -90,7 +90,35 @@ empty value means "none needed"):
 ```
 
 Environment: `BB10_CC_VERBOSE=1` prints the clang and ld command lines;
-`QNX_TARGET` points at another SDK target.
+`QNX_TARGET` points at another SDK target; `BB10_LTO_PLUGIN` names another
+linker plugin for `-flto`.
+
+### Link-time optimisation
+
+`-flto` and `-flto=thin` work:
+
+```sh
+bb10-clang++ -O2 -flto -c engine.cpp
+bb10-clang++ -O2 -flto engine.o -o engine
+```
+
+Objects compiled with `-flto` are LLVM bitcode. The driver loads LLVM's
+linker plugin (`LLVMgold.so`) into the armnto `ld` on every link, so they
+link whether or not `-flto` is repeated there. The plugin generates the code
+at the `-O` level of the link line (`-O2` when it has none); `-flto=thin`
+there selects ThinLTO, with one job per CPU.
+
+Both images put the plugin where the armnto `ar`, `ranlib` and `nm` look for
+it, so static libraries of such objects work. With the tarball unpacked by
+hand, do that once:
+
+```sh
+mkdir -p /opt/bb10-toolchain/lib/bfd-plugins
+ln -sf /usr/lib/llvm-19/lib/LLVMgold.so /opt/bb10-toolchain/lib/bfd-plugins/
+```
+
+CMake: `CMAKE_INTERPROCEDURAL_OPTIMIZATION` and `check_ipo_supported()` work
+with the toolchain file.
 
 ### Static or shared C++ runtime
 
@@ -212,7 +240,9 @@ table is outside `PT_ARM_EXIDX`:
 | `modules` + `libshape.so` | with `-shared-libc++`: virtual calls, RTTI, an exception thrown in a library and caught in the program by its base class, `thread_local` across the boundary |
 | `dlopen` + `plugin.so` | a C program loads a C++ plugin with the static runtime, which uses exceptions inside. `dlclose()` runs the plugin's static destructors |
 | `tlsbench` | `thread_local`: ns per access in the main thread and in two threads, against a global; per-thread values, alignment 16, a constructor and a destructor, 100 variables (the thread's array grows), 80 threads that exit, destructors run before the thread's variables are freed |
-| `cmake-test` | the CMake toolchain file: a C++20 program, a static and a shared library, `Threads::Threads` |
+| `modules-lto` | `-flto`: the `modules` test with the static runtime and its library as an archive of bitcode objects, indexed by the armnto `ar` |
+| `tlsbench-lto` | `-flto=thin`: `tlsbench` (emulated TLS in code the linker plugin generates) |
+| `cmake-test` | the CMake toolchain file: a C++20 program, a static and a shared library, `Threads::Threads`, `check_ipo_supported()`; the program and the static library with `INTERPROCEDURAL_OPTIMIZATION` |
 
 On the phone, copy the folder (`/opt/bb10-cxx20/tests` in the image or the
 tarball) over, for example to `/accounts/1000/shared/misc/bb10-cxx20-tests`,
@@ -241,7 +271,8 @@ GCC expects. `scripts/build-runtimes.sh` patches libc++abi to read them
 PC-relative on QNX.
 
 `exceptions-z` and `exceptions-z-shared` are newer than that run, and have
-not been run on a phone yet.
+not been run on a phone yet. Neither have `modules-lto`, `tlsbench-lto` and
+`cmake-test` as it is now, built with link-time optimisation.
 
 `tlsbench` passes on a phone (OS 10.3.3, 2026-11-16, run as a plain
 executable): 33 ns per `thread_local` access, against 66 ns with compiler-rt's

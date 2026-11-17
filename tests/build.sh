@@ -32,6 +32,13 @@ printf '#include <stdbool.h>\n#include <stdint.h>\n#include <cstdint>\n' | "$CXX
 "$CC" -O2 -Wall -Werror "$HERE/libc.c" -o "$OUT/libc"
 # thread_local: speed, and behaviour.
 "$CXX" -O2 "$HERE/tlsbench.cpp" -o "$OUT/tlsbench"
+# Link-time optimisation: the modules test with its library as an archive of
+# bitcode objects, which the armnto ar has to index, and tlsbench with ThinLTO.
+"$CXX" -O2 -flto -c "$HERE/shape.cpp" -o "$OUT/shape-lto.o"
+"${B}ar" rcs "$OUT/libshape-lto.a" "$OUT/shape-lto.o"
+"$CXX" -O2 -flto "$HERE/modules.cpp" "$OUT/libshape-lto.a" -o "$OUT/modules-lto"
+"$CXX" -O2 -flto=thin "$HERE/tlsbench.cpp" -o "$OUT/tlsbench-lto"
+rm -f "$OUT/shape-lto.o" "$OUT/libshape-lto.a"
 # Exceptions, step by step.
 "$CXX" -O2 "$HERE/exceptions.cpp" -o "$OUT/exceptions"
 # With an SDK library that exports libgcc's unwinder ahead of the C++ runtime.
@@ -53,7 +60,7 @@ for lib in "$LIB/libc.so.3" "$LIB/libm.so.2" "$OUT/libc++_shared.so.1" "$OUT/lib
     "${B}nm" -D --defined-only "$lib" | awk '{ print $3 }'
 done | sort -u >"$defined"
 status=0
-for f in cxx20 cxx20-shared modules dlopen libc tlsbench exceptions exceptions-z exceptions-z-shared cmake-test libshape.so plugin.so libc++_shared.so.1; do
+for f in cxx20 cxx20-shared modules modules-lto dlopen libc tlsbench tlsbench-lto exceptions exceptions-z exceptions-z-shared cmake-test libshape.so plugin.so libc++_shared.so.1; do
     missing=$("${B}nm" -D --undefined-only "$OUT/$f" | awk '$1 == "U" { print $2 }' | sort -u | comm -23 - "$defined")
     if [ -n "$missing" ]; then
         echo "$f: not on BB10: $missing"

@@ -16,3 +16,9 @@ add_library(greeting STATIC greeting.cpp)
 add_library(counter SHARED counter.c)
 add_executable(cmake-test main.cpp)
 target_link_libraries(cmake-test PRIVATE greeting counter Threads::Threads)
+
+# Link-time optimisation for the program and the static library, which CMake
+# archives with CMAKE_CXX_COMPILER_AR. Fails here if the toolchain cannot.
+include(CheckIPOSupported)
+check_ipo_supported()
+set_property(TARGET greeting cmake-test PROPERTY INTERPROCEDURAL_OPTIMIZATION ON)
