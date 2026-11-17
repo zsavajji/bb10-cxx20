@@ -13,7 +13,7 @@ RUN test -e /usr/lib/llvm-19/lib/LLVMgold.so \
     && ln -sf /usr/lib/llvm-19/lib/LLVMgold.so /opt/bb10-toolchain/lib/bfd-plugins/LLVMgold.so
 
 ARG BB10_CXX20_RELEASE=v19.1.7-5
-ARG BB10_CXX20_SHA256=30e9d1fa556e3e35a6b0fb9a9c8d36f8ca0c1cebfbeaa093413c3072d549121e
+ARG BB10_CXX20_SHA256=959fcc271663b746dc9518b99b45e0fa5ceaece62b71bdace9b4004e9518498b
 ADD --checksum=sha256:${BB10_CXX20_SHA256} \
     https://github.com/zsavajji/bb10-cxx20/releases/download/${BB10_CXX20_RELEASE}/bb10-cxx20.tar.gz \
     /tmp/bb10-cxx20.tar.gz
