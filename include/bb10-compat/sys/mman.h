@@ -1,6 +1,9 @@
 /* BB10's <sys/mman.h>, plus madvise() and its MADV_* advice, as QNX 7 has
  * them: QNX 6.6 has only posix_madvise(). Implemented in libbb10-cxx20-rt.a
- * (src-rt/posix2008.c). */
+ * (src-rt/posix2008.c).
+ *
+ * MADV_DONTNEED does nothing: the pages keep their contents, they do not
+ * read as zero afterwards. */
 #include_next <sys/mman.h>
 
 #ifndef BB10_CXX20_SYS_MMAN_H

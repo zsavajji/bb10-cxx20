@@ -89,8 +89,11 @@ int main(void)
 
     size_t length = 1 << 16;
     void *pages = mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
-    check("madvise", pages != MAP_FAILED && madvise(pages, length, MADV_WILLNEED) == 0
-            && madvise(pages, length, MADV_DONTNEED) == 0);
+    check("madvise", pages != MAP_FAILED && madvise(pages, length, MADV_WILLNEED) == 0);
+    /* MADV_DONTNEED does nothing: the contents stay. */
+    memset(pages, 0x5a, length);
+    check("madvise DONTNEED", madvise(pages, length, MADV_DONTNEED) == 0
+            && ((unsigned char *)pages)[length - 1] == 0x5a);
     munmap(pages, length);
 
     printf("%s\n", failures ? "FAILED" : "all passed");

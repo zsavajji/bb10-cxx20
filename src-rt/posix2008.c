@@ -255,9 +255,17 @@ int dup3(int oldfd, int newfd, int flags)
 }
 
 /* QNX 7's madvise() over QNX 6.6's posix_madvise(), which returns the error
- * instead of setting errno. */
+ * instead of setting errno.
+ *
+ * MADV_DONTNEED is not passed on. On BB10 the call frees nothing and leaves
+ * the pages' contents, but takes about 80 us per 4 KB page (measured on a
+ * Passport by chromium-for-bb10's memprobe.c). So unlike on Linux, the pages
+ * do not read as zero afterwards: a caller that needs that has to memset(). */
 int madvise(void *addr, size_t len, int advice)
 {
+    if (advice == POSIX_MADV_DONTNEED) {
+        return 0;
+    }
     int error = posix_madvise(addr, len, advice);
     if (error) {
         errno = error;

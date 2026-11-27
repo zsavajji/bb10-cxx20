@@ -120,6 +120,16 @@ ln -sf /usr/lib/llvm-19/lib/LLVMgold.so /opt/bb10-toolchain/lib/bfd-plugins/
 CMake: `CMAKE_INTERPROCEDURAL_OPTIMIZATION` and `check_ipo_supported()` work
 with the toolchain file.
 
+### MADV_DONTNEED
+
+BB10 does not give memory back for `posix_madvise(POSIX_MADV_DONTNEED)`: the
+pages stay, with their contents, and the call takes about 80 µs per 4 KB page
+(5 ms for 256 KB, 320 ms for 16 MB, on a Passport). `madvise()` here returns 0
+without making it. Code from Linux that expects such pages to read as zero is
+wrong on BB10 either way and has to `memset()` them; code that calls
+`posix_madvise()` itself still pays for the call. To release memory, map over
+the range again (`mmap` with `MAP_FIXED`).
+
 ### Static or shared C++ runtime
 
 - **Static (default).** libc++, libc++abi and libunwind go into the program,
@@ -151,7 +161,7 @@ the two over a process boundary or a C interface.
 | `bin/bb10-clang` | The driver (Python; `bb10-clang++` is a symlink). It compiles with clang for `armv7-none-eabi` with BB10's flags (`-mcpu=cortex-a9 -mfpu=neon -mfloat-abi=softfp -D__QNX__ …`; every BB10 phone's CPU, Cortex-A9 or Krait, has NEON, and with it clang vectorizes integer loops: 7–10 times faster for byte and int16 loops on a Q10), with libc++'s headers ahead of the SDK's. It links with the armnto `ld`: `crt1.o`/`crti.o`/`crtn.o`, the C++ runtime, `libbb10-cxx20-rt.a`, `libm`, `libc` and compiler-rt's builtins. |
 | `lib/libc++.a`, `libc++abi.a`, `libunwind.a` | The static runtime, hermetic. |
 | `lib/libc++_shared.so.1` | The shared runtime. |
-| `lib/libbb10-cxx20-rt.a` | What BB10 lacks and every program may need: emulated TLS (`thread_local`, `src-rt/emutls.c`) and compiler-rt's atomic libcalls, `__dso_handle`, and libc functions QNX 6.6 lacks: `aligned_alloc`, `vasprintf`/`asprintf`, `getline`/`getdelim`, `memmem`, `memrchr`, `strchrnul`, `mkostemp`, `pipe2`, `dup3`, `madvise` (over `posix_madvise`), `malloc_usable_size` (over `_msize`), `wcsnlen`, `mbsnrtowcs`, `wcsnrtombs`. |
+| `lib/libbb10-cxx20-rt.a` | What BB10 lacks and every program may need: emulated TLS (`thread_local`, `src-rt/emutls.c`) and compiler-rt's atomic libcalls, `__dso_handle`, and libc functions QNX 6.6 lacks: `aligned_alloc`, `vasprintf`/`asprintf`, `getline`/`getdelim`, `memmem`, `memrchr`, `strchrnul`, `mkostemp`, `pipe2`, `dup3`, `madvise` (over `posix_madvise`; [`MADV_DONTNEED` does nothing](#madv_dontneed)), `malloc_usable_size` (over `_msize`), `wcsnlen`, `mbsnrtowcs`, `wcsnrtombs`. |
 | `include/c++/v1` | libc++'s headers. |
 | `include/bb10-compat` | Small wrappers over SDK headers that libc++ trips on (below). |
 | `share/bb10-cxx20.cmake` | CMake toolchain file. |
