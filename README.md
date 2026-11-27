@@ -120,6 +120,13 @@ ln -sf /usr/lib/llvm-19/lib/LLVMgold.so /opt/bb10-toolchain/lib/bfd-plugins/
 CMake: `CMAKE_INTERPROCEDURAL_OPTIMIZATION` and `check_ipo_supported()` work
 with the toolchain file.
 
+### Profiling on the phone
+
+`tools/profile/kevcap.sh HOST PROCESS` records QNX's kernel event trace while
+the program runs and shows where its busiest thread (or the one named) spent
+its time: per thread state and, for time blocked on another process, which
+process and request.
+
 ### MADV_DONTNEED
 
 BB10 does not give memory back for `posix_madvise(POSIX_MADV_DONTNEED)`: the
