@@ -288,6 +288,12 @@ exit.
   floating point (libc++ 20).
 - File times in `<filesystem>` have one-second resolution, and
   `remove_all` works by path (no `openat`).
+- `temp_directory_path()` is `$TMPDIR`, or else `/var/tmp`, not `/tmp`:
+  on BB10 `/tmp` links to `/dev/shmem`, where procnto's shared memory
+  objects overlay a directory of the root filesystem. A `mkdir` there can
+  land on either and a lookup finds only procnto's entries, so
+  `create_directories`, `rename` and `remove_all` fail there (`EEXIST`,
+  `EXDEV`, `EBADF`) and leave entries `ls /tmp` lists but no path reaches.
 - `thread_local` costs a call to `__emutls_get_address` per access (emulated
   TLS), a short one: see `tests/tlsbench`.
 - XIAZY's driver adds `-lbps` to executables; this one does not. Add it if

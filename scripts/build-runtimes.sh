@@ -54,6 +54,17 @@ if ! grep -q "locale_base_api/qnx.h" "$LIBCXX/__locale_dir/locale_base_api.h"; t
     grep -q "defined(__MVS__) || defined(__QNX__)" "$SRC/libcxx/src/filesystem/operations.cpp"
 fi
 
+# temp_directory_path() without TMPDIR: /var/tmp, not /tmp. On BB10 /tmp links to
+# /dev/shmem, where procnto's shared memory objects overlay a directory of the root
+# filesystem: a nested mkdir can land on either, lookups find only procnto's entries,
+# and create_directories, rename and remove_all fail. /var/tmp is an ordinary
+# world-writable (1777) directory.
+FS_OPS="$SRC/libcxx/src/filesystem/operations.cpp"
+if ! grep -q '"/var/tmp"' "$FS_OPS"; then
+    sed -i 's|^#  if defined(__ANDROID__)$|#  if defined(__QNX__)\n    ret = "/var/tmp";\n#  elif defined(__ANDROID__)|' "$FS_OPS"
+    grep -q '"/var/tmp"' "$FS_OPS"
+fi
+
 # libc++abi's __cxa_end_cleanup is assembly, which -fvisibility=hidden does
 # not reach: hide it too in the hermetic static library.
 ABI_EXC="$SRC/libcxxabi/src/cxa_exception.cpp"
