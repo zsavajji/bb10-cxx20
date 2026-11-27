@@ -204,6 +204,11 @@ def link(args, shared_cxx):
         rt = [] if nort or not os.path.exists(rt_lib) else [rt_lib]
         # Searched as a group, since these libraries refer to each other.
         group = ["--start-group"] + cxx + rt + ["-lm", "-lc", BUILTINS, "--end-group"]
+        # -fprofile-generate and -fprofile-instr-generate: clang adds the profile
+        # runtime when it links, which this driver does itself. -u pulls in the
+        # object that writes the profile at exit.
+        if any(a.startswith(("-fprofile-generate", "-fprofile-instr-generate")) for a in cflags):
+            group = ["-u", "__llvm_profile_runtime", PREFIX + "/lib/libclang_rt.profile.a"] + group
         if shared:
             cmd = [BINUTILS + "ld", "-shared"] + common + ["-o", out] + first + inputs + group
         else:

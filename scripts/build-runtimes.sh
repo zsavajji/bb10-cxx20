@@ -1,7 +1,7 @@
 #!/bin/sh
 # Builds the C++20 runtime for BB10 into PREFIX (default /opt/bb10-cxx20):
 # LLVM libunwind, libc++abi and libc++, static, and all three in one
-# libc++_shared.so, plus libbb10-cxx20-rt.a
+# libc++_shared.so, plus libclang_rt.profile.a (PGO) and libbb10-cxx20-rt.a
 # (emulated TLS, and compiler-rt's atomic helpers, which the image's bare-metal
 # builtins leave out). Runs inside XIAZY's blackberry10-toolchain image, with
 # the LLVM sources at SRC (an llvm-project tree holding at least cmake, llvm,
@@ -142,6 +142,37 @@ runtimes "$BUILD/static" "$PREFIX" \
     -DLIBCXX_ENABLE_SHARED=OFF -DLIBCXX_ENABLE_STATIC=ON \
     -DLIBUNWIND_HIDE_SYMBOLS=ON -DLIBCXXABI_HERMETIC_STATIC_LIBRARY=ON \
     -DLIBCXX_HERMETIC_STATIC_LIBRARY=ON
+# libclang_rt.profile.a, for -fprofile-generate and -fprofile-instr-generate:
+# compiler-rt's profile runtime. For ELF, clang leaves finding the counters to
+# the linker's __start_/__stop_ section symbols, which armnto's ld provides, so
+# QNX takes Linux's platform file. (With InstrProfilingPlatformOther.c, which
+# waits for registrations nothing makes, it links and writes empty profiles.)
+PROF="$SRC/compiler-rt/lib/profile"
+if ! grep -q "defined(__QNX__)" "$PROF/InstrProfilingPlatformLinux.c"; then
+    sed -i 's|^\(\s*\)defined(_AIX)$|\1defined(_AIX) \|\| defined(__QNX__)|' "$PROF/InstrProfilingPlatformLinux.c"
+    # (No <elf.h> in the SDK: it is only for build IDs, which go without.)
+    sed -i 's|^#if !defined(_AIX)$|#if !defined(_AIX) \&\& !defined(__QNX__)|' "$PROF/InstrProfilingPlatformLinux.c"
+    grep -q "defined(_AIX) || defined(__QNX__)" "$PROF/InstrProfilingPlatformLinux.c"
+    grep -q "!defined(_AIX) && !defined(__QNX__)" "$PROF/InstrProfilingPlatformLinux.c"
+fi
+mkdir -p "$BUILD/profile"
+for f in "$PROF"/*.c "$PROF"/InstrProfilingRuntime.cpp; do
+    case $f in
+    *PlatformLinux.c) ;;
+    *Platform*|*WindowsMMap.c) continue ;;
+    esac
+    case $f in
+    *.cpp) cc="$PREFIX/bin/bb10-clang++ -fno-exceptions -fno-rtti" ;;
+    *) cc="$CC" ;;
+    esac
+    o=$(basename "$f")
+    BB10_CXX20_NOSTDLIB=1 $cc -O2 -I"$SRC/compiler-rt/include" -I"$PROF" \
+        -DCOMPILER_RT_HAS_ATOMICS=1 -DCOMPILER_RT_HAS_FCNTL_LCK=1 -DCOMPILER_RT_HAS_UNAME=1 \
+        -c "$f" -o "$BUILD/profile/${o%.*}.o"
+done
+rm -f "$PREFIX/lib/libclang_rt.profile.a"
+/opt/bb10-toolchain/bin/arm-unknown-nto-qnx6.5.0eabi-ar rcs "$PREFIX/lib/libclang_rt.profile.a" "$BUILD"/profile/*.o
+
 # The licenses of what the prefix contains: LLVM's (Apache 2.0 with LLVM
 # Exceptions) for the runtimes and compiler-rt's parts, and this
 # repository's (MIT) for the driver, headers and libbb10-cxx20-rt.a's own code.

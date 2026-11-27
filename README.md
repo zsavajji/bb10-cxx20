@@ -120,6 +120,24 @@ ln -sf /usr/lib/llvm-19/lib/LLVMgold.so /opt/bb10-toolchain/lib/bfd-plugins/
 CMake: `CMAKE_INTERPROCEDURAL_OPTIMIZATION` and `check_ipo_supported()` work
 with the toolchain file.
 
+### Profile-guided optimisation
+
+Build with `-fprofile-generate=DIR` (when compiling and linking), run the
+program on the phone as it is really used, copy the `.profraw` files from DIR,
+merge them with the image's `llvm-profdata`, and build again with
+`-fprofile-use`:
+
+```sh
+bb10-clang++ -O2 -flto=thin -fprofile-generate=/var/tmp/pgo app.cpp -o app
+llvm-profdata merge -o app.profdata *.profraw
+bb10-clang++ -O2 -flto=thin -fprofile-use=app.profdata app.cpp -o app
+```
+
+The profile is written when the program exits normally (`exit()` or a return
+from `main()`). BB10 closes apps without that: such a program has to call
+`__llvm_profile_write_file()` itself. DIR must be writable by the program. The
+speed gain on a phone has not been measured with this toolchain.
+
 ### Profiling on the phone
 
 `tools/profile/kevcap.sh HOST PROCESS` records QNX's kernel event trace while
@@ -168,6 +186,7 @@ the two over a process boundary or a C interface.
 | `bin/bb10-clang` | The driver (Python; `bb10-clang++` is a symlink). It compiles with clang for `armv7-none-eabi` with BB10's flags (`-mcpu=cortex-a9 -mfpu=neon -mfloat-abi=softfp -D__QNX__ …`; every BB10 phone's CPU, Cortex-A9 or Krait, has NEON, and with it clang vectorizes integer loops: 7–10 times faster for byte and int16 loops on a Q10), with libc++'s headers ahead of the SDK's. It links with the armnto `ld`: `crt1.o`/`crti.o`/`crtn.o`, the C++ runtime, `libbb10-cxx20-rt.a`, `libm`, `libc` and compiler-rt's builtins. |
 | `lib/libc++.a`, `libc++abi.a`, `libunwind.a` | The static runtime, hermetic. |
 | `lib/libc++_shared.so.1` | The shared runtime. |
+| `lib/libclang_rt.profile.a` | compiler-rt's profile runtime, for [PGO](#profile-guided-optimisation). |
 | `lib/libbb10-cxx20-rt.a` | What BB10 lacks and every program may need: emulated TLS (`thread_local`, `src-rt/emutls.c`) and compiler-rt's atomic libcalls, `__dso_handle`, and libc functions QNX 6.6 lacks: `aligned_alloc`, `vasprintf`/`asprintf`, `getline`/`getdelim`, `memmem`, `memrchr`, `strchrnul`, `mkostemp`, `pipe2`, `dup3`, `madvise` (over `posix_madvise`; [`MADV_DONTNEED` does nothing](#madv_dontneed)), `malloc_usable_size` (over `_msize`), `wcsnlen`, `mbsnrtowcs`, `wcsnrtombs`. |
 | `include/c++/v1` | libc++'s headers. |
 | `include/bb10-compat` | Small wrappers over SDK headers that libc++ trips on (below). |
@@ -259,6 +278,7 @@ table is outside `PT_ARM_EXIDX`:
 | `tlsbench` | `thread_local`: ns per access in the main thread and in two threads, against a global; per-thread values, alignment 16, a constructor and a destructor, 100 variables (the thread's array grows), 80 threads that exit, destructors run before the thread's variables are freed |
 | `modules-lto` | `-flto`: the `modules` test with the static runtime and its library as an archive of bitcode objects, indexed by the armnto `ar` |
 | `tlsbench-lto` | `-flto=thin`: `tlsbench` (emulated TLS in code the linker plugin generates) |
+| `pgo` | `-fprofile-generate`: the profile runtime finds the program's counters and writes them |
 | `cmake-test` | the CMake toolchain file: a C++20 program, a static and a shared library, `Threads::Threads`, `check_ipo_supported()`; the program and the static library with `INTERPROCEDURAL_OPTIMIZATION` |
 
 On the phone, copy the folder (`/opt/bb10-cxx20/tests` in the image or the
@@ -287,9 +307,10 @@ Linux (GOT-relative), but armnto's `ld` writes them PC-relative, as QNX's
 GCC expects. `scripts/build-runtimes.sh` patches libc++abi to read them
 PC-relative on QNX.
 
-`exceptions-z` and `exceptions-z-shared` are newer than that run, and have
-not been run on a phone yet. Neither have `modules-lto`, `tlsbench-lto` and
-`cmake-test` as it is now, built with link-time optimisation.
+**Every test, the newer ones too** (`exceptions-z*`, the `-lto` ones,
+`cmake-test`, `pgo`, `libc`'s `MADV_DONTNEED` check), passes on a Passport
+(OS 10.3.3, 2026-11-27, run as root over SSH). There too, a program built with
+`-fprofile-generate` wrote its profile at exit, and `-fprofile-use` took it.
 
 `tlsbench` passes on a phone (OS 10.3.3, 2026-11-16, run as a plain
 executable): 33 ns per `thread_local` access, against 66 ns with compiler-rt's
