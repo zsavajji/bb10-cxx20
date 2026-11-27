@@ -148,7 +148,7 @@ the two over a process boundary or a C interface.
 
 | | |
 |---|---|
-| `bin/bb10-clang` | The driver (Python; `bb10-clang++` is a symlink). It compiles with clang for `armv7-none-eabi` with BB10's flags (`-mcpu=cortex-a9 -mfpu=vfpv3-d16 -mfloat-abi=softfp -D__QNX__ …`), with libc++'s headers ahead of the SDK's. It links with the armnto `ld`: `crt1.o`/`crti.o`/`crtn.o`, the C++ runtime, `libbb10-cxx20-rt.a`, `libm`, `libc` and compiler-rt's builtins. |
+| `bin/bb10-clang` | The driver (Python; `bb10-clang++` is a symlink). It compiles with clang for `armv7-none-eabi` with BB10's flags (`-mcpu=cortex-a9 -mfpu=neon -mfloat-abi=softfp -D__QNX__ …`; every BB10 phone's CPU, Cortex-A9 or Krait, has NEON, and with it clang vectorizes integer loops: 7–10 times faster for byte and int16 loops on a Q10), with libc++'s headers ahead of the SDK's. It links with the armnto `ld`: `crt1.o`/`crti.o`/`crtn.o`, the C++ runtime, `libbb10-cxx20-rt.a`, `libm`, `libc` and compiler-rt's builtins. |
 | `lib/libc++.a`, `libc++abi.a`, `libunwind.a` | The static runtime, hermetic. |
 | `lib/libc++_shared.so.1` | The shared runtime. |
 | `lib/libbb10-cxx20-rt.a` | What BB10 lacks and every program may need: emulated TLS (`thread_local`, `src-rt/emutls.c`) and compiler-rt's atomic libcalls, `__dso_handle`, and libc functions QNX 6.6 lacks: `aligned_alloc`, `vasprintf`/`asprintf`, `getline`/`getdelim`, `memmem`, `memrchr`, `strchrnul`, `mkostemp`, `pipe2`, `dup3`, `madvise` (over `posix_madvise`), `malloc_usable_size` (over `_msize`), `wcsnlen`, `mbsnrtowcs`, `wcsnrtombs`. |
