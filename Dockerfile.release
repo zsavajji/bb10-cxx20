@@ -2,8 +2,8 @@
 # /opt/bb10-cxx20 from GitHub, checked against its sha256): the same image
 # as the Dockerfile's, without building LLVM's runtimes.
 #
-#   docker build -f Dockerfile.release -t bb10-cxx20:19.1.7-6 .
-#   docker run --rm -v "$PWD:/src" -w /src bb10-cxx20:19.1.7-6 bb10-clang++ -O2 app.cpp -o app
+#   docker build -f Dockerfile.release -t bb10-cxx20:19.1.7-7 .
+#   docker run --rm -v "$PWD:/src" -w /src bb10-cxx20:19.1.7-7 bb10-clang++ -O2 app.cpp -o app
 FROM ghcr.io/xiazy/blackberry10-toolchain@sha256:60ce49510a37ed92368cca010bbaabf97b12d209b9fab179e8491b266bb2578f
 
 # Link-time optimisation: LLVM's linker plugin where the armnto ar, ranlib and nm look for
@@ -12,8 +12,8 @@ RUN test -e /usr/lib/llvm-19/lib/LLVMgold.so \
     && mkdir -p /opt/bb10-toolchain/lib/bfd-plugins \
     && ln -sf /usr/lib/llvm-19/lib/LLVMgold.so /opt/bb10-toolchain/lib/bfd-plugins/LLVMgold.so
 
-ARG BB10_CXX20_RELEASE=v19.1.7-6
-ARG BB10_CXX20_SHA256=916280aa613d9cbbbf563bc25d474d544c8f935adefda2d4bda0b99b12bc2d4a
+ARG BB10_CXX20_RELEASE=v19.1.7-7
+ARG BB10_CXX20_SHA256=4093a551a0835faa4863e71e56e978ab7d66a29c632dbb79126a82e445dcf417
 ADD --checksum=sha256:${BB10_CXX20_SHA256} \
     https://github.com/zsavajji/bb10-cxx20/releases/download/${BB10_CXX20_RELEASE}/bb10-cxx20.tar.gz \
     /tmp/bb10-cxx20.tar.gz
